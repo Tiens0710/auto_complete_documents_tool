@@ -1,0 +1,13 @@
+/.env
+/vendor/
+/output/
+/outputs/
+/tmp/
+/.tmp-spreadsheet/
+/storage/uploads/*
+/storage/logs/*
+/storage/sessions/*
+/storage/exports/*
+!/storage/uploads/.gitkeep
+!/storage/logs/.gitkeep
+!/storage/sessions/.gitkeep

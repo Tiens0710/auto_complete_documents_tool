@@ -1,0 +1,22 @@
+{
+  "name": "aivanban/aivanban",
+  "description": "Nhap Excel va tao bo ho so dao tao nghe theo trinh do.",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.2",
+    "ext-fileinfo": "*",
+    "ext-zip": "*",
+    "mpdf/mpdf": "^8.2",
+    "phpoffice/phpspreadsheet": "^2.3 || ^3.0 || ^4.0 || ^5.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "AIVANBAN\\": "src/"
+    }
+  },
+  "config": {
+    "sort-packages": true,
+    "optimize-autoloader": true
+  }
+}
