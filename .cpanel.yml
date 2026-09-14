@@ -1,0 +1,10 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/mtpc/public_html/auto_complete_documents_tool/
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/cp -R public src storage $DEPLOYPATH
+    - /bin/cp composer.json composer.lock $DEPLOYPATH
+    - test ! -d vendor || /bin/cp -R vendor $DEPLOYPATH
+    - /bin/chmod -R 755 $DEPLOYPATH/public $DEPLOYPATH/src
+    - /bin/chmod -R 775 $DEPLOYPATH/storage
