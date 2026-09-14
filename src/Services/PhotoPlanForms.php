@@ -8,7 +8,7 @@ trait PhotoPlanForms
     private function trainingPlan(array $course,int $number,string $level,array $modules,array $schedule):string
     {
         $sc=$number===8;
-        $html=$this->pLabel($number).'<table class="photo-head"><tr><td><b>'.$this->e($this->school($course)).'</b></td><td><b>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br>Độc lập - Tự do - Hạnh phúc</td></tr></table><h1>KẾ HOẠCH ĐÀO TẠO</h1>';
+        $html=$this->pLabel($number).$this->pOfficialHeader($course).'<h1>KẾ HOẠCH ĐÀO TẠO</h1>';
         $html.='<div class="written"><p>1. Nghề đào tạo: '.$this->pValue($this->v($course,'nghedaotao')).' &nbsp; Mã nghề: '.$this->pValue($this->v($course,'manghe')).($sc?' &nbsp; Lớp: '.$this->pValue($this->v($course,'malop')):'').'</p><p>2. Trình độ đào tạo: '.$this->e($level).' nghề</p><p>3. Đối tượng tuyển sinh: '.$this->pValue($this->v($course,'doituong')).'</p><p><i>(Trình độ học vấn làm căn cứ xét tuyển)</i></p><p>4. Mục tiêu đào tạo:</p>'.$this->pLines(14,$this->v($course,'muctieu'),6);
         if($sc){
             $html.='<p>5. Thời gian khóa học: '.$this->pValue($this->v($course,'thoigiankhoa')).'</p><p>(Từ ngày '.$this->pValue($this->date($this->v($course,'ngaybatdau'))).' đến ngày '.$this->pValue($this->date($this->v($course,'ngayketthuc'))).')</p><p>6. Thời gian học tập: '.$this->pValue($this->v($course,'sotuanhoc')).' tuần, trong đó thời gian ôn và kiểm tra: '.$this->pValue($this->v($course,'sotuanonkiemtra')).' tuần.</p><p>7. Thời gian khai, bế giảng: '.$this->pValue($this->v($course,'sotuankhaibegiang')).' tuần.</p><p>8. Quyết định phê duyệt chương trình: '.$this->pValue($this->v($course,'quyetdinhchuongtrinh')).'</p></div>';

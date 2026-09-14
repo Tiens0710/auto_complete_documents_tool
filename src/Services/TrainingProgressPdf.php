@@ -63,25 +63,28 @@ final class TrainingProgressPdf
             foreach ($classChunks as $classes) {
                 if (!$first) $pdf->AddPage();
                 $first = false;
-                $box(12, 13, 91, 12, $school, 9, true);
-                $box(109, 17, 176, 6, 'Ban hành kèm theo Quyết định số 62/2008/QĐ-BLĐTBXH', 8);
-                $box(90, 26, 170, 8, 'TIẾN ĐỘ ĐÀO TẠO', 15, true);
-                $box(90, 35, 170, 7, 'NĂM HỌC: ' . ($course['namhoc'] ?? '........................'), 11);
+                $box(12, 11, 120, 7, $school, 9, true);
+                $box(158, 10, 127, 7, 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', 9, true);
+                $box(158, 17, 127, 5, 'Độc lập - Tự do - Hạnh phúc', 8);
+                $pdf->Line(201, 23, 242, 23);
+                $box(109, 24, 176, 5, 'Ban hành kèm theo Quyết định số 62/2008/QĐ-BLĐTBXH', 7);
+                $box(90, 30, 170, 8, 'TIẾN ĐỘ ĐÀO TẠO', 15, true);
+                $box(90, 39, 170, 7, 'NĂM HỌC: ' . ($course['namhoc'] ?? '........................'), 11);
                 $pdf->SetDrawColor(0, 0, 0);
-                $pdf->SetLineWidth(.22);
-                $x = 12; $y = 49; $end = 285; $weekX = 88; $noteX = 266;
+                $pdf->SetLineWidth(.25);
+                $x = 12; $y = 52; $end = 285; $weekX = 88; $noteX = 266;
                 $header = 30; $rowH = 7; $bottom = $y + $header + 5 * $rowH;
                 $pdf->Rect($x, $y, $end - $x, $bottom - $y);
                 foreach ([20, $weekX, $noteX] as $v) $pdf->Line($v, $y, $v, $bottom);
                 foreach ([10, 20] as $offset) $pdf->Line($weekX, $y + $offset, $noteX, $y + $offset);
                 foreach ([10, 20, 30] as $offset) $pdf->Line(20, $y, $weekX, $y + $offset);
                 for ($r = 0; $r < 5; $r++) $pdf->Line($x, $y + $header + $r * $rowH, $end, $y + $header + $r * $rowH);
-                $box(12, 52, 8, 10, 'TT', 10, true);
-                $box(34, 69, 28, 8, 'LỚP', 11, true);
-                $box(72, 50, 15, 5, 'Tháng');
-                $box(73, 59, 14, 5, 'Tuần');
-                $box(76, 68, 11, 7, "Từ ngày\nđến ngày", 6.5);
-                $box(267, 63, 17, 10, 'Ghi chú', 9, true);
+                $box(12, 55, 8, 10, 'TT', 10, true);
+                $box(34, 72, 28, 8, 'LỚP', 11, true);
+                $box(72, 53, 15, 5, 'Tháng');
+                $box(73, 62, 14, 5, 'Tuần');
+                $box(76, 71, 11, 7, "Từ ngày\nđến ngày", 6.5);
+                $box(267, 66, 17, 10, 'Ghi chú', 9, true);
                 $width = ($noteX - $weekX) / count($columns);
                 foreach ($columns as $ci => $week) {
                     $cx = $weekX + $ci * $width;
@@ -96,10 +99,10 @@ final class TrainingProgressPdf
                         if (!empty($event['thang'])) $months[(string) $event['thang']] = true;
                         elseif (preg_match('~^\d{2}/(\d{2})/(\d{4})$~', $start, $m)) $months[$m[1] . '/' . $m[2]] = true;
                     }
-                    $box($cx + .3, 51, $width - .6, 7, implode(', ', array_keys($months)), 7);
+                    $box($cx + .3, 54, $width - .6, 7, implode(', ', array_keys($months)), 7);
                     // Keep the actual supplied ranges in the header cell. Never
                     // point to an appendix that is not printed in this form.
-                    $box($cx + .3, 70, $width - .6, 8, implode("\n", array_keys($dates)) ?: ($week === null ? '…' : ''), 5.5);
+                    $box($cx + .3, 73, $width - .6, 8, implode("\n", array_keys($dates)) ?: ($week === null ? '…' : ''), 5.5);
                 }
                 $ri = 0;
                 foreach ($classes as $class => $weeks) {
@@ -131,14 +134,14 @@ final class TrainingProgressPdf
                 }
                 $labels = ['Khai bế giảng', 'Văn hoá THPT', 'Môn chung', "Môn học /mô-đun\nđào tạo nghề", "Thi tốt nghiệp (kiểm tra\nkết thúc khoá học)", 'Nghỉ hè, lễ', 'Lao động/ngoại khoá', "Thực tập tại doanh\nnghiệp"];
                 foreach ($labels as $i => $label) {
-                    $lx = 12 + ($i % 4) * 68.25; $ly = 119 + intdiv($i, 4) * 20;
+                    $lx = 12 + ($i % 4) * 68.25; $ly = 122 + intdiv($i, 4) * 20;
                     $pdf->Rect($lx + 25, $ly, 18, 3.5);
                     $box($lx, $ly + 5, 68.25, 12, $label, 9);
                 }
-                $box(12, 160, 273, 7, 'Ghi chú: Các cơ sở quy định các ký hiệu cụ thể cho từng nội dung sao cho không trùng lặp.', 9);
-                $box(25, 172, 110, 6, 'HIỆU TRƯỞNG/ GIÁM ĐỐC', 11, true);
-                $box(25, 180, 110, 6, '(Ký tên, đóng dấu)', 10);
-                $box(165, 172, 115, 6, 'TRƯỞNG PHÒNG ĐÀO TẠO', 11, true);
+                $box(12, 163, 273, 7, 'Ghi chú: Các cơ sở quy định các ký hiệu cụ thể cho từng nội dung sao cho không trùng lặp.', 9);
+                $box(25, 175, 110, 6, 'HIỆU TRƯỞNG/ GIÁM ĐỐC', 11, true);
+                $box(25, 183, 110, 6, '(Ký tên, đóng dấu)', 10);
+                $box(165, 175, 115, 6, 'TRƯỞNG PHÒNG ĐÀO TẠO', 11, true);
             }
         }
         $pdf->Output($path, Destination::FILE);

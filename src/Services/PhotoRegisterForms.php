@@ -13,7 +13,7 @@ trait PhotoRegisterForms
         $rows=[];foreach($students as$i=>$s){$g=$graduationByStudent[$s['student_code']]??[];$r=[$i+1,$s['full_name'],$s['date_of_birth'],$s['place_of_birth'],$s['major'],$s['course']];if($diploma)$r[]=$this->v($g,'hinhthucdaotao')?:$this->v($course,'hinhthucdaotao');$rows[]=[...$r,$this->v($g,'soquyetdinh'),$this->v($g,'sohieubangchungchi'),$this->date($this->v($g,'ngaycap')),$this->date($this->v($g,'ngaynhan')),'',$this->v($g,'ghichu')];}
         $widths=$diploma?[4,14,8,8,10,9,7,10,9,7,7,4,3]:[4,14,9,9,10,10,12,10,8,7,4,3];
         $html=$this->pCover($number,$title,$course).$this->pCertificate($number,$title,$course);
-        foreach(array_chunk($rows?:[array_fill(0,count($heads),'')],22)as$chunk)$html.=$this->pPage($number,'','L').$this->pGrid($widths,[$heads],$chunk,22,6,7.5);
+        foreach(array_chunk($rows?:[array_fill(0,count($heads),'')],22)as$chunk)$html.=$this->pPage($number,'','L').$this->pOfficialHeader($course,true).'<h2>'.$this->e($title).'</h2>'.$this->pGrid($widths,[$heads],$chunk,22,6,7.2);
         return$html;
     }
 
@@ -25,7 +25,7 @@ trait PhotoRegisterForms
         $rows=[];foreach($students as$i=>$s){$g=$graduationByStudent[$s['student_code']]??[];$source='Số sổ: '.($this->v($g,'soso')?:'.......')."\nTrang: ".($this->v($g,'sotrang')?:'.......');$copies=$this->v($g,'soluongbansao')?:$this->v($g,'soluong');$r=[$i+1,$s['full_name'],$s['date_of_birth'],$s['place_of_birth'],$this->v($g,'soquyetdinh'),$this->v($g,'sohieubangchungchi')];$rows[]=[...$r,...($number===10?[$copies,$this->v($g,'hinhthuccapbansao'),$this->date($this->v($g,'ngaycapbansao')),$source]:[$source,$this->v($g,'hinhthuccapbansao'),$this->date($this->v($g,'ngaycapbansao')),$copies]),''];}
         $widths=$number===10?[4,15,9,9,12,11,7,8,8,11,6]:[4,15,9,9,12,11,11,8,8,7,6];
         $html=$this->pCover($number,$title,$course).$this->pCertificate($number,$title,$course);
-        foreach(array_chunk($rows?:[array_fill(0,11,'')],12)as$chunk){while(count($chunk)<12){$r=array_fill(0,11,'');$r[$number===10?9:6]="Số sổ: .......\nTrang: .......";$chunk[]=$r;}$html.=$this->pPage($number,'','L').$this->pGrid($widths,[$heads],$chunk,0,11,8);}
+        foreach(array_chunk($rows?:[array_fill(0,11,'')],12)as$chunk){while(count($chunk)<12){$r=array_fill(0,11,'');$r[$number===10?9:6]="Số sổ: .......\nTrang: .......";$chunk[]=$r;}$html.=$this->pPage($number,'','L').$this->pOfficialHeader($course,true).'<h2>'.$this->e($title).'</h2>'.$this->pGrid($widths,[$heads],$chunk,0,10,7.6);}
         return$html;
     }
 
@@ -34,7 +34,7 @@ trait PhotoRegisterForms
         $html=$this->pCover($number,$title,$course).$this->pCertificate($number,$title,$course);
         foreach($students as$s){
             $grades=$gradesByStudent[$s['student_code']]??[];$g=$graduationByStudent[$s['student_code']]??[];
-            $html.=$this->pPage($number,'I. SƠ LƯỢC LÝ LỊCH').$this->pBiography($s,$number===11);
+            $html.=$this->pPage($number).$this->pOfficialHeader($course,true).'<h2>I. SƠ LƯỢC LÝ LỊCH</h2>'.$this->pBiography($s,$number===11);
             if($number===11){
                 $html.='<h2>II. KẾT QUẢ HỌC TẬP TOÀN KHÓA</h2>'.$this->pScResult($s,$g,$grades,$moduleNames,$course);
                 continue;
@@ -55,7 +55,7 @@ trait PhotoRegisterForms
         $bio='<p>Họ và tên khai sinh: '.$this->pValue($s['full_name']).' &nbsp; Nam, nữ: '.$this->pValue($s['gender']).'</p><p>Tên thường gọi: '.$value('tenthuonggoi').'</p><p>Sinh ngày: '.$this->pValue($s['date_of_birth']).'</p><p>Nơi sinh: '.$this->pValue($s['place_of_birth']).'</p><p>Quê quán: '.$this->pValue($s['hometown']).'</p><p>Nơi đăng ký thường trú: '.$this->pValue($s['permanent_address']).'</p><p>Dân tộc: '.$this->pValue($s['ethnicity']).' &nbsp; Tôn giáo: '.$this->pValue($s['religion']).'</p><p>Trình độ học vấn trước khi vào học: '.$value('trinhdohocvan').'</p><p>Ngày tham gia Đảng CSVN: '.$value('ngayvaodang').' &nbsp; Ngày chính thức: '.$value('ngaychinhthuc').'</p><p>Ngày kết nạp vào Đoàn TNCS Hồ Chí Minh: '.$value('ngayvaodoan').'</p>';
         foreach(['bo'=>'bố','me'=>'mẹ','vochong'=>'vợ (chồng)']as$key=>$label)$bio.='<p>Họ và tên '.$label.': '.$value('hoten'.$key).' &nbsp; Nghề nghiệp: '.$value('nghenghiep'.$key).'</p>';
         $bio.='<p>Đối tượng thuộc diện chính sách: '.$value('dienchinhsach').'</p><p>Nghề nghiệp làm trước khi vào học: '.$value('nghenghieptruockhihoc').'</p><p>Địa chỉ liên lạc: '.$value('diachilienlac').' &nbsp; Điện thoại: '.$this->pValue($s['phone']).'</p><p>'.($sc?'Nơi làm việc sau khi kết thúc khóa học (nếu có): '.$value('noilamviecsaukhoahoc'):'Nguyện vọng việc làm sau khi kết thúc khóa học: '.$value('nguyenvongvieclam')).'</p>'.$this->pLines(2,'',4);
-        return'<table class="bio-table"><tr><td class="bio-register" style="vertical-align:top;width:21%"><table class="registration-frame"><tr><td style="height:12mm">Số đăng ký<br>'.$value('sodangky').'</td></tr><tr><td style="height:46mm;padding:3mm"><div class="photo-box">Ảnh 3 x 4</div></td></tr></table></td><td class="bio-content" style="vertical-align:top;width:79%;font-size:9pt;line-height:1.65">'.$bio.'</td></tr></table>';
+        return'<table class="bio-table"><tr><td class="bio-register" style="vertical-align:top;width:34mm"><table class="registration-frame"><tr><td class="registration-number">Số đăng ký<br>'.$value('sodangky').'</td></tr><tr><td class="registration-photo">Ảnh 3 x 4</td></tr></table></td><td class="bio-content" style="vertical-align:top;font-size:9pt;line-height:1.65">'.$bio.'</td></tr></table>';
     }
 
     private function pYearGrid(array $left,array $right,array $moduleNames,string $course,string $yearLeft,string $yearRight):string

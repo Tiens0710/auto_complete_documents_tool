@@ -23,7 +23,7 @@ trait PhotoTeachingForms
             $hours = $this->v($r, 'sogio');
             $rows[] = [$i + 1, $teacherNames[$this->v($r, 'magiaovien')] ?? $this->v($r, 'hovaten'), $moduleNames[$this->v($r, 'mamonmodun')] ?? $this->v($r, 'tenmonmodun'), $this->v($r, 'malop'), ...array_map(fn ($w): string => $w !== null && $w === (int) $this->v($r, 'tuan') ? $hours : '', $weeks), $hours, $this->v($r, 'nhiemvukhac'), $this->v($r, 'quydoigiogiang'), $this->v($r, 'tonggiogianghocky'), $this->v($r, 'giotieuchuan'), $this->v($r, 'giothua'), $this->v($r, 'giothieu')];
         }
-        $html = $this->pLabel(2) . '<p><b>' . $this->e($this->school($course)) . '</b><br>Khoa (tổ môn): ' . $this->pValue($this->v($course, 'khoa')) . '</p><h1>KẾ HOẠCH GIÁO VIÊN</h1><p class="center">NĂM HỌC: ' . $this->pValue($this->v($course, 'namhoc')) . ' HỌC KỲ: ' . $this->pValue($this->v($course, 'hocky')) . '</p>';
+        $html = $this->pLabel(2) . $this->pOfficialHeader($course) . '<p><b>Khoa (tổ môn):</b> ' . $this->pValue($this->v($course, 'khoa')) . '</p><h1>KẾ HOẠCH GIÁO VIÊN</h1><p class="center">NĂM HỌC: ' . $this->pValue($this->v($course, 'namhoc')) . ' HỌC KỲ: ' . $this->pValue($this->v($course, 'hocky')) . '</p>';
         return $html . $this->pGrid([4, 16, 7, 7, ...array_fill(0, $nw, 26 / $nw), 6, 9, 6, 7, 6, 3, 3], $heads, $rows, 10, 6, 7.5) . $this->pSign('HIỆU TRƯỞNG/GIÁM ĐỐC', 'TRƯỞNG KHOA, BỘ MÔN');
     }
 

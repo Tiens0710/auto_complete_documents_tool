@@ -62,6 +62,15 @@ trait PhotoFormTemplates
         return '';
     }
 
+    private function pOfficialHeader(array $course, bool $compact = false): string
+    {
+        return '<table class="official-head' . ($compact ? ' official-head-compact' : '') . '"><tr>'
+            . '<td class="official-school"><b>' . $this->e($this->school($course)) . '</b></td>'
+            . '<td class="official-state"><b>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</b><br>'
+            . '<span>Độc lập - Tự do - Hạnh phúc</span><div class="official-rule">&nbsp;</div></td>'
+            . '</tr></table>';
+    }
+
     private function pPage(int $number, string $title = '', string $orientation = 'P'): string
     {
         return '<pagebreak orientation="' . $orientation . '" />' . $this->pLabel($number)
@@ -89,45 +98,53 @@ trait PhotoFormTemplates
 
     private function pCover(int $number, string $title, array $course, array $fields = []): string
     {
-        // Use table rows instead of absolute positioning. mPDF resolves absolute
-        // offsets from the current cursor, which made the cover title collapse at
-        // the top and hid the lower frame on A4 pages.
-        $school = $this->school($course);
-        $agency = $this->v($course, 'coquanchuchuan') ?: $this->v($course, 'coquanchuquan');
+        $supervisory = $this->v($course, 'coquanchuquan')
+            ?: $this->v($course, 'donviquanlytructiep')
+            ?: self::DEFAULT_SUPERVISORY_BODY;
         $detail = '';
-        if ($fields === []) {
-            $detail = '<tr style="height:16mm"><td class="cover-number">Quyển số: ' . $this->pValue($this->v($course, 'quyenso')) . '</td></tr>';
-        } else {
-            foreach ($fields as $label => $value) $detail .= '<p>' . $this->e($label) . ': ' . $this->pValue((string) $value) . '</p>';
+        foreach ($fields as $label => $value) {
+            $detail .= '<p><b>' . $this->e($label) . ':</b> ' . $this->pValue((string) $value) . '</p>';
         }
-        $inside = ($agency === '' ? '' : '<div style="text-align:center;font-size:11pt;padding-top:10mm">' . $this->e($agency) . '</div>')
-            . '<div style="text-align:center;font-size:13pt;font-weight:bold;margin-top:8mm">' . $this->e($school) . '</div>'
-            . '<div style="height:42mm">&nbsp;</div>'
-            . '<div style="text-align:center;font-size:20pt;font-weight:bold;line-height:1.45;min-height:58mm">' . $this->e($title) . '</div>';
+
+        $titleBlock = '<div class="cover-title">' . $this->e($title) . '</div>';
         if ($fields === []) {
-            $inside .= '<div style="text-align:center;font-size:12pt;margin-top:4mm">Quyển số: ' . $this->pValue($this->v($course, 'quyenso')) . '</div>';
+            $titleBlock .= '<div class="cover-number">Quyển số: ' . $this->pValue($this->v($course, 'quyenso')) . '</div>';
         } else {
-            $inside .= '<div style="font-size:11pt;line-height:1.8;text-align:left;margin:4mm 14mm 0">' . $detail . '</div>'
-                . '<div style="text-align:center;font-size:11pt;margin-top:7mm">Năm học: ' . $this->pValue($this->v($course, 'namhoc')) . '</div>';
+            $titleBlock .= '<div class="cover-fields">' . $detail . '</div>'
+                . '<div class="cover-year"><b>Năm học:</b> ' . $this->pValue($this->v($course, 'namhoc')) . '</div>';
         }
+
         return $this->pLabel($number)
-            . '<div style="border:1.5pt double #000;width:100%;height:245mm;margin-top:3mm;box-sizing:border-box;padding:0 5mm">'
-            . $inside . '</div>';
+            . '<div class="photo-cover-frame"><div class="photo-cover-border-inner"><table class="photo-cover-inner">'
+            . '<tr><td class="cover-identity"><div class="cover-agency">' . $this->e($supervisory) . '</div>'
+            . '<div class="cover-school">' . $this->e($this->school($course)) . '</div></td></tr>'
+            . '<tr><td class="cover-main">' . $titleBlock . '</td></tr>'
+            . '<tr><td class="cover-bottom">&nbsp;</td></tr>'
+            . '</table></div></div>';
     }
 
     private function pCertificate(int $number, string $title, array $course): string
     {
         $sign = in_array($number, [9, 10, 11], true) ? 'HIỆU TRƯỞNG/GIÁM ĐỐC' : 'HIỆU TRƯỞNG';
-        // Keep this page in normal table flow.  Absolute children were rendered
-        // relative to the label's current cursor by mPDF and pushed the frame
-        // down on some forms (especially M9/M10/M13/M14/M17/M18).
-        $left = '<h3>CHỨNG NHẬN</h3><p>Sổ này có: ............ trang</p><p>Đánh số trang từ số: ............</p><p>Đến số: ............</p><p>Mở sổ ngày .... tháng .... năm ....</p><br><b>'.$sign.'</b><br><i>(Ký tên, đóng dấu)</i>';
+        $bookDescription = match ($number) {
+            9 => 'Sổ cấp chứng chỉ sơ cấp nghề này',
+            10 => 'Sổ cấp bản sao chứng chỉ sơ cấp nghề này',
+            11, 15 => 'Sổ quản lý học sinh này',
+            13 => 'Sổ cấp bằng TNTCN này',
+            14 => 'Sổ cấp bằng TNCĐN này',
+            16 => 'Sổ quản lý sinh viên này',
+            17 => 'Sổ cấp bản sao bằng TNTCN này',
+            18 => 'Sổ cấp bản sao bằng TNCĐN này',
+            default => 'Sổ này',
+        };
+        $left = '<h3>CHỨNG NHẬN</h3><p>'.$this->e($bookDescription).' có: ............ trang</p><p>Đánh số trang từ số: ............</p><p>Đến số: ............</p><p>Mở sổ ngày .... tháng .... năm ....</p><b>'.$sign.'</b><br><i>(Ký tên, đóng dấu)</i>';
         $right = '<h3>CHỨNG NHẬN</h3><p>Số thứ tự đăng ký từ số: ............</p><p>Đến số: ............</p><p>Khóa sổ ngày .... tháng .... năm ....</p><br><b>'.$sign.'</b><br><i>(Ký tên, đóng dấu)</i>';
         return '<pagebreak orientation="P" />'.$this->pLabel($number)
-            . '<div style="border:1.5pt double #000;width:100%;height:245mm;margin-top:3mm;box-sizing:border-box;padding:0 5mm">'
-            . '<div style="text-align:center;font-size:18pt;font-weight:bold;line-height:1.4;padding-top:50mm;height:105mm;box-sizing:border-box">'.$this->e($title).'<br><br><span style="font-size:12pt">Quyển số: '.$this->pValue($this->v($course,'quyenso')).'</span></div>'
-            . '<table class="photo-certificate"><tr><td>'.$left.'</td><td>'.$right.'</td></tr></table>'
-            . '</div>';
+            . '<div class="photo-certificate-frame"><table class="photo-certificate-inner">'
+            . '<tr><td class="certificate-title">'.$this->e($title).'<div class="certificate-number">Quyển số: '.$this->pValue($this->v($course,'quyenso')).'</div></td></tr>'
+            . '<tr><td class="certificate-block"><table class="photo-certificate"><tr><td>'.$left.'</td><td>'.$right.'</td></tr></table></td></tr>'
+            . '<tr><td class="certificate-bottom">&nbsp;</td></tr>'
+            . '</table></div>';
     }
 
     private function renderPdf(string $pdfDir, string $tempDir, string $filename, array $format, string $html): string
@@ -153,9 +170,10 @@ trait PhotoFormTemplates
         return '<style>
 body{font-family:dejavuserif;font-size:10pt;line-height:1.25;color:#000}
 h1{text-align:center;font-size:16pt;margin:6mm 0 2mm}h2{text-align:center;font-size:12pt;margin:5mm 0 4mm}h3{font-size:10pt;margin:4mm 0 2mm}p{margin:1mm 0}.center{text-align:center}.photo-label{text-align:right;font-size:7.5pt;line-height:1.3;margin-bottom:4mm}
-.photo-grid{border-collapse:collapse;width:100%;margin:2mm 0;table-layout:fixed}.photo-grid th,.photo-grid td{border:.5pt solid #000;padding:.6mm .8mm;vertical-align:middle;word-wrap:break-word}.photo-grid th{text-align:center;font-weight:bold;background:#fff}.photo-grid td{text-align:left;background:#fff}.photo-grid .photo-grid{margin:0}
-.photo-cover-frame{border-collapse:collapse;border:1.5pt double #000;width:100%;height:245mm;margin-top:3mm}.photo-cover-frame>tbody>tr>td{padding:5mm;vertical-align:top}.photo-cover-inner{border-collapse:collapse;width:100%;height:235mm;text-align:center}.photo-cover-inner td{border:0;vertical-align:middle}.cover-agency{font-size:11pt}.cover-school{font-size:13pt}.cover-title{font-size:20pt;line-height:1.45}.cover-number{font-size:12pt}.cover-year{font-size:11pt}.cover-fields{text-align:left;padding:0 14mm;line-height:1.8;font-size:11pt}.cover-fields p{margin:1.5mm 0}.photo-certificate-frame{border-collapse:collapse;border:1.5pt double #000;width:100%;height:245mm;margin-top:3mm}.photo-certificate-frame>tbody>tr>td{vertical-align:top;padding:5mm}.certificate-title{text-align:center;font-size:18pt;font-weight:bold;line-height:1.4;padding-top:50mm;height:105mm;box-sizing:border-box}.photo-certificate{width:100%;margin-top:0}.photo-certificate td{width:50%;vertical-align:top;text-align:left;font-size:9pt;padding:3mm;line-height:1.8}.photo-certificate h3{text-align:center}
- .photo-sign{width:100%;margin-top:10mm}.photo-sign td{width:50%;height:25mm;text-align:center;vertical-align:top;font-size:10pt}.photo-head{width:100%;margin:1mm 0 4mm}.photo-head td{width:50%;text-align:center;vertical-align:top;font-size:9pt}.written{line-height:1.5}.photo-legend{width:100%;font-size:8.5pt;text-align:center;margin:3mm 0}.photo-legend td{width:25%;padding:2mm}.photo-legend .key{border:.5pt solid #000;width:18mm;height:3mm;margin:auto}.lesson-meta{width:100%;margin:6mm 0}.lesson-meta td{width:50%;vertical-align:top;font-size:10pt;line-height:1.8}.lesson-table .photo-grid td{vertical-align:top}.bio-table{width:100%;border-collapse:collapse;margin-bottom:4mm}.bio-table>tbody>tr>td{vertical-align:top}.bio-table p{font-size:8.3pt;line-height:1.35;margin:0 0 1.1mm}.bio-register{width:24%;padding:0 4mm 0 0}.bio-content{width:76%}.registration-frame{width:100%;border-collapse:collapse}.registration-frame td{border:.6pt solid #000;text-align:center;font-size:9pt}.photo-box{width:30mm;height:40mm;border:.6pt solid #000;display:block;margin:0 auto;line-height:40mm;text-align:center}.profile-pair{width:100%;border-collapse:collapse}.profile-pair>tbody>tr>td{width:50%;padding:0;vertical-align:top}.grad-summary{font-size:8pt;line-height:1.7}.grad-summary p{margin:2mm}.usage{font-size:11pt;line-height:1.65;text-align:justify}.usage p{margin:3mm 0}
+.official-head{border-collapse:collapse;width:100%;table-layout:fixed;margin:0 0 5mm}.official-head td{width:50%;border:0;padding:0 2mm;text-align:center;vertical-align:top;font-size:9.5pt;line-height:1.3}.official-head-compact{margin-top:4mm;margin-bottom:3mm}.official-head-compact td{font-size:9pt}.official-state b,.official-school b{font-weight:bold}.official-rule{border-top:.7pt solid #000;width:34mm;height:1mm;margin:1.2mm auto 0}
+.photo-grid{border-collapse:collapse;width:100%;margin:2mm 0;table-layout:fixed;page-break-inside:avoid}.photo-grid th,.photo-grid td{border:.65pt solid #000;padding:.75mm 1mm;vertical-align:middle;line-height:1.15;word-wrap:break-word}.photo-grid th{text-align:center;font-weight:bold;background:#fff}.photo-grid td{text-align:left;background:#fff}.photo-grid .photo-grid{margin:0}
+.photo-cover-frame{border:.7pt solid #000;width:100%;height:245mm;margin-top:3mm;box-sizing:border-box;padding:1.2mm}.photo-cover-border-inner{border:.7pt solid #000;width:100%;height:242mm;box-sizing:border-box;padding:4mm}.photo-cover-inner{border-collapse:collapse;width:100%;height:232mm;table-layout:fixed;text-align:center}.photo-cover-inner td{border:0;padding:0 8mm;vertical-align:middle}.cover-identity{height:50mm;vertical-align:top!important;padding-top:6mm!important}.cover-agency{font-size:11pt;font-weight:bold;text-transform:uppercase;line-height:1.3;margin-bottom:5mm}.cover-school{font-size:13pt;font-weight:bold;text-transform:uppercase;line-height:1.35}.cover-main{height:111mm}.cover-title{font-size:20pt;font-weight:bold;line-height:1.45;margin:0 auto 5mm;max-width:160mm}.cover-number{font-size:13pt;font-weight:bold}.cover-year{font-size:11pt;margin-top:7mm}.cover-fields{text-align:left;margin:8mm auto 0;width:128mm;line-height:1.65;font-size:10.5pt}.cover-fields p{margin:1.5mm 0}.cover-bottom{height:71mm}.photo-certificate-frame{border:.9pt solid #000;width:100%;height:245mm;margin-top:3mm;box-sizing:border-box;padding:5mm}.photo-certificate-inner{border-collapse:collapse;width:100%;height:233mm;table-layout:fixed}.photo-certificate-inner td{border:0}.certificate-title{text-align:center;font-size:19pt;font-weight:bold;line-height:1.42;height:100mm;padding:30mm 8mm 0;vertical-align:middle;box-sizing:border-box}.certificate-number{font-size:13pt;margin-top:4mm}.certificate-block{height:76mm;vertical-align:top}.certificate-bottom{height:57mm}.photo-certificate{border-collapse:collapse;width:100%;table-layout:fixed;margin:0}.photo-certificate td{width:50%;border:0;vertical-align:top;text-align:center;font-size:10pt;padding:2mm 3mm;line-height:1.55}.photo-certificate p{margin:1mm 0}.photo-certificate h3{text-align:center;font-size:11pt;margin:0 0 2mm}
+ .photo-sign{width:100%;margin-top:10mm}.photo-sign td{width:50%;height:25mm;text-align:center;vertical-align:top;font-size:10pt}.photo-head{width:100%;margin:1mm 0 4mm}.photo-head td{width:50%;text-align:center;vertical-align:top;font-size:9pt}.written{line-height:1.5}.photo-legend{width:100%;font-size:8.5pt;text-align:center;margin:3mm 0}.photo-legend td{width:25%;padding:2mm}.photo-legend .key{border:.65pt solid #000;width:18mm;height:3mm;margin:auto}.lesson-meta{width:100%;margin:6mm 0}.lesson-meta td{width:50%;vertical-align:top;font-size:10pt;line-height:1.8}.lesson-table .photo-grid td{vertical-align:top}.bio-table{width:100%;border-collapse:collapse;margin-bottom:4mm}.bio-table>tbody>tr>td{vertical-align:top}.bio-table p{font-size:8.3pt;line-height:1.35;margin:0 0 1.1mm}.bio-register{width:34mm;padding:0 4mm 0 0}.bio-content{padding-left:1mm}.registration-frame{width:30mm;border-collapse:collapse;table-layout:fixed;margin:0 auto}.registration-frame td{width:30mm;border:.65pt solid #000;text-align:center;font-size:9pt;padding:0}.registration-number{height:10mm;vertical-align:middle}.registration-photo{height:40mm;vertical-align:middle;line-height:1.25}.profile-pair{width:100%;border-collapse:collapse}.profile-pair>tbody>tr>td{width:50%;padding:0;vertical-align:top}.grad-summary{font-size:8pt;line-height:1.7}.grad-summary p{margin:2mm}.usage{font-size:11pt;line-height:1.65;text-align:justify}.usage p{margin:3mm 0}
 </style>';
     }
 }
