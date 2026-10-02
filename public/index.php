@@ -106,27 +106,41 @@ $e = [Html::class, 'escape'];
 </head>
 <body>
 <header class="topbar">
-    <a class="brand" href="./"><span>AI</span>VANBAN</a>
-    <a class="template-link" href="?action=download-template">Tải Excel mẫu</a>
+    <div class="topbar-inner">
+        <a class="brand" href="./" aria-label="AIVANBAN - Trang chủ">AI<span>VAN</span>BAN</a>
+        <a class="template-link" href="?action=download-template">Tải file Excel mẫu</a>
+    </div>
 </header>
 
 <main class="page">
     <section class="hero">
         <div>
             <p class="eyebrow">HỒ SƠ ĐÀO TẠO NGHỀ</p>
-            <h1>Một lần nhập liệu.<br><em>Đủ bộ hồ sơ.</em></h1>
-            <p class="lead">Chọn trình độ, nhập dữ liệu từ Excel và kiểm tra bộ biểu mẫu trước khi tạo tài liệu.</p>
+            <h1>Tạo bộ hồ sơ đào tạo</h1>
+            <p class="lead">Nhập Excel một lần, rà soát dữ liệu và xuất PDF theo trình độ.</p>
         </div>
         <div class="hero-note">
-            <strong>Quy tắc bộ hồ sơ</strong>
-            <span>Bộ cơ bản Mẫu 1–7</span>
-            <b>+</b>
-            <span>Bộ riêng theo trình độ</span>
+            <strong>BỘ HỒ SƠ GỒM</strong>
+            <span>Mẫu chung 1–7 <b>+</b> mẫu theo trình độ</span>
         </div>
     </section>
 
+    <nav class="workflow" aria-label="Các bước tạo hồ sơ">
+        <ol>
+            <li class="<?= is_array($inspection) ? 'is-done' : 'is-current' ?>" <?= !is_array($inspection) ? 'aria-current="step"' : '' ?>>
+                <span class="workflow-number">01</span><span>Chọn trình độ và Excel</span>
+            </li>
+            <li class="<?= is_array($inspection) ? 'is-current' : 'is-upcoming' ?>" <?= is_array($inspection) ? 'aria-current="step"' : '' ?>>
+                <span class="workflow-number">02</span><span>Rà soát dữ liệu</span>
+            </li>
+            <li class="<?= $canExport ? 'is-ready' : 'is-upcoming' ?>">
+                <span class="workflow-number">03</span><span>Tạo và tải PDF</span>
+            </li>
+        </ol>
+    </nav>
+
     <?php if ($message !== null): ?>
-        <div class="notice"><?= $e($message) ?></div>
+        <div class="notice" role="status" aria-live="polite"><?= $e($message) ?></div>
     <?php endif; ?>
 
     <section class="panel upload-panel">
@@ -148,8 +162,9 @@ $e = [Html::class, 'escape'];
             <label class="file-field">
                 <span>File dữ liệu</span>
                 <input type="file" name="excel_file" accept=".xlsx,.xls,.csv" required>
+                <small>Hỗ trợ XLSX, XLS hoặc CSV · tối đa 10 MB</small>
             </label>
-            <button type="submit">Đọc và kiểm tra file</button>
+            <button type="submit">Đọc file và tiếp tục</button>
         </form>
     </section>
 
@@ -157,12 +172,13 @@ $e = [Html::class, 'escape'];
         <section class="panel">
             <div class="section-heading">
                 <span>02</span>
-                <div><h2>Ánh xạ cột sinh viên</h2><p><?= $e($inspection['filename']) ?> · Sheet <?= $e($inspection['student_sheet']) ?></p></div>
+                <div><h2>Ánh xạ cột sinh viên</h2><p><?= $e($inspection['filename']) ?> <span aria-hidden="true">·</span> Sheet <?= $e($inspection['student_sheet']) ?></p></div>
             </div>
             <form method="post">
                 <input type="hidden" name="action" value="remap">
                 <input type="hidden" name="csrf" value="<?= $e($_SESSION['csrf']) ?>">
                 <input type="hidden" name="level" value="<?= $e($level) ?>">
+                <p class="section-hint">Đối chiếu tiêu đề Excel với trường thông tin tương ứng. Trường có dấu * là bắt buộc.</p>
                 <div class="mapping-grid">
                     <?php foreach (StudentMapper::fields() as $key => $definition): ?>
                         <label>
@@ -208,13 +224,13 @@ $e = [Html::class, 'escape'];
     <section class="panel">
         <div class="section-heading">
             <span><?= is_array($inspection) ? '04' : '02' ?></span>
-            <div><h2>Danh mục legacy <?= $e(mb_strtolower($levels[$level], 'UTF-8')) ?></h2><p>Tham khảo Quyết định 62/2008; không mặc định là mẫu hiện hành của trường.</p></div>
+            <div><h2>Bộ biểu mẫu <?= $e(mb_strtolower($levels[$level], 'UTF-8')) ?></h2><p>Mẫu tham khảo theo Quyết định 62/2008. Đối chiếu quy định và mẫu đang áp dụng tại trường trước khi ký.</p></div>
         </div>
         <div class="form-list">
             <?php foreach ($forms as $form): ?>
                 <article class="form-item">
                     <div class="form-number"><?= str_pad((string) $form['number'], 2, '0', STR_PAD_LEFT) ?></div>
-                    <div><h3><?= $e($form['name']) ?></h3><p><?= $e($form['scope']) ?></p></div>
+                    <div class="form-description"><h3><?= $e($form['name']) ?></h3><p><?= $e($form['scope']) ?></p></div>
                     <?php if (is_array($inspection)): ?>
                         <span class="status <?= $form['ready'] ? 'ready' : 'missing' ?>"><?= $form['ready'] ? 'Có dữ liệu tham khảo' : 'Thiếu dữ liệu: ' . $e(implode(', ', $form['missing_sheets'])) ?></span>
                     <?php else: ?>
@@ -227,7 +243,7 @@ $e = [Html::class, 'escape'];
             <div class="export-box">
                 <div>
                     <strong>Tạo bộ văn bản</strong>
-                    <p>Hệ thống tạo riêng từng PDF theo nhóm biểu mẫu và bộ theo trình độ. Các ô chưa có dữ liệu được để trống để bạn kiểm tra trước khi ký.</p>
+                    <p>Xuất từng biểu mẫu thành PDF trong một file ZIP. Nội dung chưa có dữ liệu sẽ để trống để bạn kiểm tra.</p>
                 </div>
                 <?php if ($canExport): ?>
                     <form method="post">
