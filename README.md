@@ -9,6 +9,7 @@ Công cụ web nhập dữ liệu Excel và chuẩn bị bộ hồ sơ đào t�
 Phiên bản nền tảng đã có:
 
 - Chọn sơ cấp, trung cấp hoặc cao đẳng.
+- Giao diện chia thành ba trang: tải Excel → kiểm tra danh sách → xuất hồ sơ. Mẫu trống mở ở trang riêng; các bước sau chỉ mở khi dữ liệu đã hợp lệ.
 - Xác định đúng bộ biểu mẫu theo trình độ.
 - Tải và đọc `.xlsx`, `.xls`, `.csv` tối đa 10 MB.
 - Tự nhận diện dữ liệu một sheet theo mẫu người học; ghép `Họ đệm` + `Tên` và dùng `TT` làm mã liên kết.

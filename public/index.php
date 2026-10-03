@@ -27,6 +27,10 @@ session_start([
 
 $_SESSION['csrf'] ??= bin2hex(random_bytes(32));
 $action = (string) ($_GET['action'] ?? $_POST['action'] ?? 'home');
+$view = (string) ($_GET['step'] ?? 'upload');
+if (!in_array($view, ['upload', 'review', 'export', 'samples'], true)) {
+    $view = 'upload';
+}
 
 if ($action === 'download-template') {
     (new TemplateGenerator())->output();
@@ -60,6 +64,7 @@ $inspection = $_SESSION['inspection'] ?? null;
 $mapping = [];
 $mapped = ['students' => [], 'errors' => []];
 $message = null;
+$hasFailure = false;
 $draftTemplateReady = true;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -75,7 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['level'] = $level;
             $mapping = StudentMapper::suggest($inspection['headers']);
             $_SESSION['mapping'] = $mapping;
-            $message = 'Đã đọc file và tự động đề xuất ánh xạ cột.';
+            header('Location: ?step=review', true, 303);
+            exit;
         } elseif ($action === 'remap' && is_array($inspection)) {
             foreach (StudentMapper::fields() as $key => $_definition) {
                 $raw = (string) ($_POST['mapping'][$key] ?? '');
@@ -97,6 +103,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } catch (Throwable $exception) {
         $message = $exception->getMessage();
+        $hasFailure = true;
+        $view = in_array($action, ['export', 'export-form'], true) ? 'export' : 'upload';
         if ($action === 'inspect') {
             $inspection = null;
             unset($_SESSION['inspection'], $_SESSION['mapping']);
@@ -120,6 +128,20 @@ $canExport = $draftTemplateReady
     && isset($inspection['sheet_data'])
     && $mapped['students'] !== []
     && $mapped['errors'] === [];
+if (in_array($view, ['review', 'export'], true) && !is_array($inspection)) {
+    header('Location: ?step=upload', true, 303);
+    exit;
+}
+if ($view === 'export' && !$canExport) {
+    header('Location: ?step=review', true, 303);
+    exit;
+}
+$titles = [
+    'upload' => ['Từ Excel đến bộ hồ sơ', 'Tải danh sách lên, kiểm tra một lần và nhận bộ hồ sơ của bạn.'],
+    'review' => ['Kiểm tra danh sách người học', 'Xem lại dữ liệu trước khi chuyển sang xuất hồ sơ.'],
+    'export' => ['Hồ sơ đã sẵn sàng để tải', 'Tải toàn bộ bộ hồ sơ hoặc chọn từng biểu mẫu.'],
+    'samples' => ['Xem mẫu biểu trước khi nhập', 'Chọn trình độ và biểu mẫu bạn muốn tham khảo.'],
+];
 $e = [Html::class, 'escape'];
 
 header('Content-Type: text/html; charset=UTF-8');
@@ -135,28 +157,42 @@ header('X-Content-Type-Options: nosniff');
     <meta name="color-scheme" content="light">
     <title>AIVANBAN - Tạo hồ sơ đào tạo</title>
     <link rel="stylesheet" href="assets/app.css?v=<?= (string) filemtime(__DIR__ . '/assets/app.css') ?>">
+    <script src="assets/app.js?v=<?= (string) filemtime(__DIR__ . '/assets/app.js') ?>" defer></script>
 </head>
-<body>
+<body class="page-<?= $e($view) ?>">
 <header class="site-header">
     <div class="site-header-inner">
         <a class="brand" href="./" aria-label="AIVANBAN - Trường Trung cấp Miền Tây - Trang chủ">
             <img class="school-logo" src="assets/logo-truong-trung-cap-mien-tay.png" alt="">
             <span class="brand-copy"><span class="brand-name">AIVANBAN</span><span class="brand-school">Trường Trung cấp Miền Tây</span></span>
         </a>
-        <a class="template-link" href="?action=download-template">Tải file Excel mẫu</a>
+        <a class="template-link" href="?action=download-template" aria-label="Tải file Excel mẫu">Tải Excel mẫu</a>
     </div>
 </header>
 
 <main class="page-shell">
     <section class="page-intro">
-        <h1>Tạo hồ sơ đào tạo</h1>
-        <p class="intro-description">Xem mẫu trống, tải Excel lên và xuất bộ hồ sơ PDF.</p>
+        <h1><?= $e($titles[$view][0]) ?></h1>
+        <p class="intro-description"><?= $e($titles[$view][1]) ?></p>
     </section>
 
-    <?php if ($message !== null): ?>
-        <div class="notice" role="status" aria-live="polite"><span class="notice-icon" aria-hidden="true">i</span><?= $e($message) ?></div>
+    <?php if ($view !== 'samples'): ?>
+        <nav class="workflow" aria-label="Các bước tạo hồ sơ">
+            <ol>
+                <?php $stepNumber = 0; ?>
+                <?php foreach (['upload' => 'Tải Excel', 'review' => 'Kiểm tra', 'export' => 'Xuất hồ sơ'] as $step => $label): ?>
+                    <li <?= $view === $step ? 'aria-current="step"' : '' ?>><span class="workflow-number" aria-hidden="true"><?= ++$stepNumber ?></span><span><?= $e($label) ?></span></li>
+                <?php endforeach; ?>
+            </ol>
+        </nav>
     <?php endif; ?>
 
+    <?php if ($message !== null): ?>
+        <div class="notice <?= $hasFailure ? 'notice-error' : '' ?>" role="<?= $hasFailure ? 'alert' : 'status' ?>"><span class="notice-icon" aria-hidden="true"><?= $hasFailure ? '!' : 'i' ?></span><?= $e($message) ?></div>
+    <?php endif; ?>
+
+    <?php if ($view === 'samples'): ?>
+    <a class="back-link" href="?step=<?= is_array($inspection) ? 'review' : 'upload' ?>">← Quay lại tạo hồ sơ</a>
     <section class="section-block forms-section" aria-labelledby="forms-title">
         <div class="section-heading forms-heading">
             <div>
@@ -164,6 +200,7 @@ header('X-Content-Type-Options: nosniff');
                 <p><?= count($forms) ?> biểu mẫu cho trình độ <?= $e($levels[$level]) ?>.</p>
             </div>
             <form class="form-level-filter" method="get">
+                <input type="hidden" name="step" value="samples">
                 <label for="catalog-level">Trình độ</label>
                 <select id="catalog-level" name="level">
                     <?php foreach ($levels as $value => $label): ?>
@@ -184,13 +221,13 @@ header('X-Content-Type-Options: nosniff');
                     <option value="" selected disabled>Chọn một biểu mẫu</option>
                     <optgroup label="Biểu mẫu theo trình độ">
                         <?php foreach ($levelForms as $form): ?>
-                            <?php $formLabel = $form['name'] . (is_array($inspection) && !$form['ready'] ? ' (Thiếu bảng: ' . implode(', ', $form['missing_sheets']) . ')' : ''); ?>
+                            <?php $formLabel = $form['name']; ?>
                             <option value="<?= $e($form['number']) ?>"><?= $e($formLabel) ?></option>
                         <?php endforeach; ?>
                     </optgroup>
                     <optgroup label="Biểu mẫu chung 1-7">
                         <?php foreach ($commonForms as $form): ?>
-                            <?php $formLabel = $form['name'] . (is_array($inspection) && !$form['ready'] ? ' (Thiếu bảng: ' . implode(', ', $form['missing_sheets']) . ')' : ''); ?>
+                            <?php $formLabel = $form['name']; ?>
                             <option value="<?= $e($form['number']) ?>"><?= $e($formLabel) ?></option>
                         <?php endforeach; ?>
                     </optgroup>
@@ -199,33 +236,50 @@ header('X-Content-Type-Options: nosniff');
             </div>
         </form>
     </section>
+    <?php endif; ?>
 
+    <?php if ($view === 'upload'): ?>
     <section class="section-block upload-section" aria-labelledby="upload-title">
         <div class="section-heading">
             <div>
-                <h2 id="upload-title">Tải bảng Excel</h2>
-                <p>Trình độ đã chọn: <strong><?= $e($levels[$level]) ?></strong></p>
+                <h2 id="upload-title">Chọn file để bắt đầu</h2>
+                <p>Dùng danh sách hiện có hoặc tải file Excel mẫu ở trên.</p>
             </div>
         </div>
         <form method="post" enctype="multipart/form-data" class="upload-form">
             <input type="hidden" name="action" value="inspect">
             <input type="hidden" name="csrf" value="<?= $e($_SESSION['csrf']) ?>">
-            <input type="hidden" name="level" value="<?= $e($level) ?>">
-            <label class="field-group file-field">
-                <span class="field-label">Tệp dữ liệu người học</span>
-                <input type="file" name="excel_file" accept=".xlsx,.xls,.csv" required aria-describedby="file-help">
-                <small id="file-help">XLSX, XLS hoặc CSV. Tối đa 10 MB.</small>
+            <label class="field-group level-field" for="upload-level">
+                <span class="field-label">Trình độ đào tạo</span>
+                <select id="upload-level" name="level">
+                    <?php foreach ($levels as $value => $label): ?>
+                        <option value="<?= $e($value) ?>" <?= $level === $value ? 'selected' : '' ?>><?= $e($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
             </label>
-            <button class="button button-primary upload-button" type="submit">Đọc và kiểm tra</button>
+            <label class="file-drop" for="excel-file">
+                <span class="file-drop-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 17V11m-3 3 3-3 3 3"/></svg></span>
+                <span class="file-drop-title" id="selected-file" aria-live="polite">Thả file Excel vào đây</span>
+                <span class="file-drop-caption" id="file-help">XLSX, XLS hoặc CSV · Tối đa 10 MB</span>
+                <span class="file-pick-label">Hoặc chọn file từ máy</span>
+                <input id="excel-file" type="file" name="excel_file" accept=".xlsx,.xls,.csv" required aria-label="Chọn file Excel" aria-describedby="file-help selected-file">
+            </label>
+            <button class="button button-primary upload-button" type="submit">Tiếp tục →</button>
         </form>
     </section>
+    <div class="upload-links">
+        <a href="?step=samples">Xem mẫu trống</a>
+        <?php if (is_array($inspection)): ?><a href="?step=review">Tiếp tục với danh sách đã tải →</a><?php endif; ?>
+    </div>
+    <?php endif; ?>
 
-    <?php if (is_array($inspection)): ?>
+    <?php if ($view === 'review'): ?>
         <section class="section-block data-section" aria-labelledby="data-title">
             <div class="section-heading">
                 <div>
                     <h2 id="data-title">Kiểm tra danh sách</h2>
                     <p><?= count($mapped['students']) ?> người học được đọc từ tệp</p>
+                    <p><?= $e($inspection['filename']) ?> · <?= $e($levels[$level]) ?></p>
                 </div>
                 <span class="result-count <?= $mapped['errors'] === [] ? 'result-ok' : 'result-error' ?>">
                     <?= count($mapped['errors']) === 0 ? 'Không có lỗi' : count($mapped['errors']) . ' mục cần sửa' ?>
@@ -253,9 +307,22 @@ header('X-Content-Type-Options: nosniff');
                 <p class="table-note">Đang xem 20 trên <?= count($mapped['students']) ?> người học.</p>
             <?php endif; ?>
         </section>
+        <div class="step-actions">
+            <a class="button button-secondary" href="?step=upload">← Chọn file khác</a>
+            <?php if ($canExport): ?>
+                <a class="button button-primary" href="?step=export">Tiếp tục xuất hồ sơ →</a>
+            <?php else: ?>
+                <p class="export-disabled">Sửa các lỗi trong Excel và tải lại để tiếp tục.</p>
+            <?php endif; ?>
+        </div>
     <?php endif; ?>
 
-    <?php if (is_array($inspection)): ?>
+    <?php if ($view === 'export'): ?>
+        <div class="step-actions export-navigation">
+            <a class="back-link" href="?step=review">← Quay lại kiểm tra</a>
+            <a class="back-link" href="?step=samples">Xem mẫu trống</a>
+        </div>
+        <p class="export-summary"><?= count($mapped['students']) ?> người học · <?= $e($levels[$level]) ?> · <?= count($forms) ?> biểu mẫu</p>
         <section class="export-box" aria-label="Xuất hồ sơ">
             <div>
                 <strong>Xuất bộ hồ sơ</strong>
@@ -292,6 +359,7 @@ header('X-Content-Type-Options: nosniff');
                 </div>
             </details>
         <?php endif; ?>
+        <div class="step-actions"><a class="back-link" href="?step=upload">Tạo hồ sơ từ file khác</a></div>
     <?php endif; ?>
 </main>
 
