@@ -11,12 +11,13 @@ Phiên bản nền tảng đã có:
 - Chọn sơ cấp, trung cấp hoặc cao đẳng.
 - Xác định đúng bộ biểu mẫu theo trình độ.
 - Tải và đọc `.xlsx`, `.xls`, `.csv` tối đa 10 MB.
-- Tự nhận diện sheet `SinhVien` và đề xuất ánh xạ cột.
-- Cho phép sửa ánh xạ cột.
+- Tự nhận diện dữ liệu một sheet theo mẫu người học; ghép `Họ đệm` + `Tên` và dùng `TT` làm mã liên kết.
+- Lớp, khóa và nghề/ngành không có trong mẫu người học được để trống, không chặn nhập.
 - Kiểm tra trường bắt buộc và mã người học trùng.
 - Xem trước tối đa 20 dòng trên giao diện.
 - Kiểm tra sheet dữ liệu còn thiếu cho từng biểu mẫu.
-- Tải workbook mẫu gồm 10 sheet nghiệp vụ.
+- Tải workbook mẫu một sheet `SinhVien`, đúng 22 cột dữ liệu người học.
+- Thông tin văn bằng có thể điền vào biểu mẫu cấp bằng; điểm tổng hợp không được suy diễn thành bảng điểm theo mô-đun.
 - Chuyển ngày dạng số nội bộ của Excel về định dạng `dd/mm/yyyy` khi xem trước.
 - Xuất một bộ PDF sạch theo từng biểu mẫu, kèm README trong file ZIP.
 - Ô ảnh hồ sơ dùng kích thước 30×40 mm theo tỉ lệ ảnh 3×4.

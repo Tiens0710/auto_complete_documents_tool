@@ -11,16 +11,12 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 final class TemplateGenerator
 {
     private const SHEETS = [
-        'ThongTinKhoaHoc' => ['Cơ quan chủ quản', 'Cơ sở đào tạo', 'Mã khóa', 'Tên khóa', 'Trình độ', 'Nghề đào tạo', 'Mã nghề', 'Ngày bắt đầu', 'Ngày kết thúc'],
-        'LopHoc' => ['Mã lớp', 'Tên lớp', 'Mã khóa', 'Giáo viên chủ nhiệm'],
-        'SinhVien' => ['MSSV', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'Nơi sinh', 'Quê quán', 'Địa chỉ thường trú', 'Điện thoại', 'Dân tộc', 'Tôn giáo', 'Lớp', 'Khóa', 'Nghề đào tạo'],
-        'GiaoVien' => ['Mã giáo viên', 'Họ và tên', 'Khoa/bộ môn'],
-        'MonHocMoDun' => ['Mã môn/mô-đun', 'Tên môn/mô-đun', 'Lý thuyết', 'Thực hành', 'Kiểm tra'],
-        'PhanCongGiangDay' => ['Mã giáo viên', 'Mã lớp', 'Mã môn/mô-đun', 'Từ ngày', 'Đến ngày', 'Số giờ'],
-        'LichDaoTao' => ['Mã lớp', 'Tuần', 'Từ ngày', 'Đến ngày', 'Nội dung', 'Loại hoạt động'],
-        'Diem' => ['MSSV', 'Mã môn/mô-đun', 'Điểm định kỳ 1', 'Điểm định kỳ 2', 'Điểm kết thúc lần 1', 'Điểm kết thúc lần 2', 'Điểm tổng kết'],
-        'ChuyenCan' => ['MSSV', 'Ngày', 'Số giờ nghỉ có phép', 'Số giờ nghỉ không phép'],
-        'TotNghiepCapBang' => ['MSSV', 'Số quyết định', 'Ngày quyết định', 'Xếp loại tốt nghiệp', 'Số hiệu bằng/chứng chỉ', 'Ngày cấp', 'Ngày nhận'],
+        'SinhVien' => [
+            'TT', 'Họ đệm', 'Tên', 'Giới tính', 'Ngày sinh', 'Nơi sinh', 'Số CCCD', 'Ngày cấp',
+            'Số điện thoại', 'Dân tộc', 'Tôn giáo', 'Quốc tịch', 'Ngày nhập học', 'Ngày tốt nghiệp',
+            'Xếp loại', 'Số hiệu văn bằng', 'Ngày cấp văn bằng', 'Số vào sổ cấp bằng',
+            'Địa chỉ liên hệ', 'Điểm thi lý thuyết', 'Điểm thi thực hành', 'ĐTKKH',
+        ],
     ];
 
     public function output(): never

@@ -241,10 +241,10 @@ header('X-Content-Type-Options: nosniff');
             <div class="table-wrap">
                 <table>
                     <caption class="visually-hidden">Bản xem trước danh sách người học</caption>
-                    <thead><tr><th scope="col">Mã người học</th><th scope="col">Họ và tên</th><th scope="col">Ngày sinh</th><th scope="col">Lớp</th><th scope="col">Khóa</th><th scope="col">Nghề/ngành</th></tr></thead>
+                    <thead><tr><th scope="col">TT</th><th scope="col">Họ và tên</th><th scope="col">Ngày sinh</th><th scope="col">Điện thoại</th><th scope="col">Số hiệu văn bằng</th><th scope="col">Ngày cấp văn bằng</th></tr></thead>
                     <tbody>
                     <?php foreach (array_slice($mapped['students'], 0, 20) as $student): ?>
-                        <tr><td><?= $e($student['student_code']) ?></td><td><?= $e($student['full_name']) ?></td><td><?= $e($student['date_of_birth']) ?></td><td><?= $e($student['class_code']) ?></td><td><?= $e($student['course']) ?></td><td><?= $e($student['major']) ?></td></tr>
+                        <tr><td><?= $e($student['student_code']) ?></td><td><?= $e($student['full_name']) ?></td><td><?= $e($student['date_of_birth']) ?></td><td><?= $e($student['phone']) ?></td><td><?= $e($student['diploma_number']) ?></td><td><?= $e($student['diploma_issue_date']) ?></td></tr>
                     <?php endforeach; ?>
                     </tbody>
                 </table>

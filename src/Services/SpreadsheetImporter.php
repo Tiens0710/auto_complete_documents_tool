@@ -56,6 +56,26 @@ final class SpreadsheetImporter
         $studentRows = $studentSheetName !== null ? ($sheets[$studentSheetName] ?? []) : [];
         $headers = array_map(static fn ($value): string => trim((string) $value), array_shift($studentRows) ?? []);
 
+        if ($studentSheetName !== null) {
+            if (Vietnamese::compactKey($studentSheetName) !== Vietnamese::compactKey('SinhVien')) {
+                $sheets['SinhVien'] = $sheets[$studentSheetName];
+                $sheetData['SinhVien'] = $sheetData[$studentSheetName];
+            }
+
+            $graduationData = self::buildGraduationSheet($headers, $studentRows);
+            $hasGraduationSheet = false;
+            foreach (array_keys($sheetData) as $name) {
+                if (Vietnamese::compactKey($name) === Vietnamese::compactKey('TotNghiepCapBang')) {
+                    $hasGraduationSheet = true;
+                    break;
+                }
+            }
+            if ($graduationData !== null && !$hasGraduationSheet) {
+                $sheetData['TotNghiepCapBang'] = $graduationData;
+                $sheets['TotNghiepCapBang'] = [$graduationData['headers'], ...$graduationData['rows']];
+            }
+        }
+
         return [
             'filename' => basename((string) $file['name']),
             'sheets' => array_map('count', $sheets),
@@ -66,11 +86,65 @@ final class SpreadsheetImporter
         ];
     }
 
+    /**
+     * Builds only the graduation fields represented explicitly in the one-sheet student format.
+     * Exam summary scores stay labeled as source data and are not expanded into module grades.
+     */
+    public static function buildGraduationSheet(array $headers, array $rows): ?array
+    {
+        $columns = [];
+        foreach ($headers as $index => $header) {
+            $columns[Vietnamese::compactKey((string) $header)] = $index;
+        }
+
+        foreach (['tt', 'hodem', 'ten', 'ngaysinh'] as $requiredHeader) {
+            if (!array_key_exists($requiredHeader, $columns)) {
+                return null;
+            }
+        }
+
+        $fields = [
+            'MSSV' => 'tt',
+            'Xếp loại tốt nghiệp' => 'xeploai',
+            'Số hiệu bằng/chứng chỉ' => 'sohieuvanbang',
+            'Ngày cấp' => 'ngaycapvanbang',
+            'Số vào sổ cấp bằng' => 'sovaosocapbang',
+            'Ngày tốt nghiệp' => 'ngaytotnghiep',
+            'Điểm thi lý thuyết' => 'diemthilythuyet',
+            'Điểm thi thực hành' => 'diemthithuchanh',
+            'ĐTKKH' => 'dtkkh',
+        ];
+        $graduationIndexes = array_intersect_key($columns, array_flip(array_slice(array_values($fields), 1)));
+        if ($graduationIndexes === []) {
+            return null;
+        }
+
+        $records = [];
+        foreach (array_slice($rows, 0, 5000) as $row) {
+            $record = [];
+            foreach ($fields as $target => $source) {
+                $index = $columns[$source] ?? null;
+                $record[] = $index === null ? '' : trim((string) ($row[$index] ?? ''));
+            }
+            if ($record[0] === '' || count(array_filter(array_slice($record, 1), static fn (string $value): bool => $value !== '')) === 0) {
+                continue;
+            }
+            $records[] = $record;
+        }
+
+        return $records === [] ? null : ['headers' => array_keys($fields), 'rows' => $records];
+    }
+
     private function findStudentSheet(array $sheetNames): ?string
     {
         foreach ($sheetNames as $name) {
+            if (Vietnamese::compactKey($name) === Vietnamese::compactKey('SinhVien')) {
+                return $name;
+            }
+        }
+        foreach ($sheetNames as $name) {
             $normalized = Vietnamese::compactKey($name);
-            if (in_array($normalized, ['sinhvien', 'hocsinh', 'student', 'students'], true)) {
+            if (in_array($normalized, ['hocsinh', 'student', 'students'], true)) {
                 return $name;
             }
         }
