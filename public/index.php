@@ -33,9 +33,27 @@ if ($action === 'download-template') {
 }
 
 $levels = FormCatalog::levels();
-$level = (string) ($_POST['level'] ?? $_SESSION['level'] ?? 'trung_cap');
+$level = (string) ($_POST['level'] ?? $_GET['level'] ?? $_SESSION['level'] ?? 'trung_cap');
 if (!isset($levels[$level])) {
     $level = 'trung_cap';
+}
+
+if ($action === 'preview') {
+    $previewLevel = (string) ($_GET['level'] ?? '');
+    $previewNumber = filter_var($_GET['form'] ?? null, FILTER_VALIDATE_INT);
+    session_write_close();
+
+    try {
+        (new PdfDossierExporter())->outputBlankPreview($previewLevel, $previewNumber === false ? 0 : (int) $previewNumber);
+    } catch (InvalidArgumentException) {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=UTF-8');
+        exit('Không tìm thấy biểu mẫu xem trước.');
+    } catch (Throwable) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=UTF-8');
+        exit('Chưa thể tạo bản xem trước. Vui lòng thử lại hoặc liên hệ quản trị viên.');
+    }
 }
 
 $inspection = $_SESSION['inspection'] ?? null;
@@ -66,6 +84,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['mapping'] = $mapping;
             $_SESSION['level'] = $level;
             $message = 'Đã cập nhật ánh xạ và kiểm tra lại dữ liệu.';
+        } elseif ($action === 'export-form' && is_array($inspection)) {
+            $formNumber = filter_var($_POST['form_number'] ?? null, FILTER_VALIDATE_INT);
+            if ($formNumber === false) {
+                throw new InvalidArgumentException('Vui lòng chọn biểu mẫu cần tải riêng.');
+            }
+            $mapping = $_SESSION['mapping'] ?? StudentMapper::suggest($inspection['headers']);
+            (new PdfDossierExporter())->outputForm($level, (int) $formNumber, $inspection, $mapping);
         } elseif ($action === 'export' && is_array($inspection)) {
             $mapping = $_SESSION['mapping'] ?? StudentMapper::suggest($inspection['headers']);
             (new PdfDossierExporter())->output($level, $inspection, $mapping);
@@ -88,12 +113,18 @@ $availableSheets = is_array($inspection)
     ? array_keys(array_filter($inspection['sheets'], static fn (int $rowCount): bool => $rowCount > 1))
     : [];
 $forms = FormCatalog::package($level, $availableSheets);
+$commonForms = array_filter($forms, static fn (array $form): bool => $form['number'] <= 7);
+$levelForms = array_filter($forms, static fn (array $form): bool => $form['number'] > 7);
 $canExport = $draftTemplateReady
     && is_array($inspection)
     && isset($inspection['sheet_data'])
     && $mapped['students'] !== []
     && $mapped['errors'] === [];
 $e = [Html::class, 'escape'];
+
+header('Content-Type: text/html; charset=UTF-8');
+header('Cache-Control: private, no-store, max-age=0');
+header('X-Content-Type-Options: nosniff');
 ?>
 <!doctype html>
 <html lang="vi">
@@ -101,116 +132,116 @@ $e = [Html::class, 'escape'];
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
-    <title>AIVANBAN — Tạo hồ sơ đào tạo</title>
-    <link rel="stylesheet" href="assets/app.css">
+    <meta name="color-scheme" content="light">
+    <title>AIVANBAN - Tạo hồ sơ đào tạo</title>
+    <link rel="stylesheet" href="assets/app.css?v=<?= (string) filemtime(__DIR__ . '/assets/app.css') ?>">
 </head>
 <body>
-<header class="topbar">
-    <div class="topbar-inner">
-        <a class="brand" href="./" aria-label="AIVANBAN - Trang chủ">AI<span>VAN</span>BAN</a>
+<header class="site-header">
+    <div class="site-header-inner">
+        <a class="brand" href="./" aria-label="AIVANBAN - Trường Trung cấp Miền Tây - Trang chủ">
+            <img class="school-logo" src="assets/logo-truong-trung-cap-mien-tay.png" alt="">
+            <span class="brand-copy"><span class="brand-name">AIVANBAN</span><span class="brand-school">Trường Trung cấp Miền Tây</span></span>
+        </a>
         <a class="template-link" href="?action=download-template">Tải file Excel mẫu</a>
     </div>
 </header>
 
-<main class="page">
-    <section class="hero">
-        <div>
-            <p class="eyebrow">HỒ SƠ ĐÀO TẠO NGHỀ</p>
-            <h1>Tạo bộ hồ sơ đào tạo</h1>
-            <p class="lead">Nhập Excel một lần, rà soát dữ liệu và xuất PDF theo trình độ.</p>
-        </div>
-        <div class="hero-note">
-            <strong>BỘ HỒ SƠ GỒM</strong>
-            <span>Mẫu chung 1–7 <b>+</b> mẫu theo trình độ</span>
-        </div>
+<main class="page-shell">
+    <section class="page-intro">
+        <h1>Tạo hồ sơ đào tạo</h1>
+        <p class="intro-description">Xem mẫu trống, tải Excel lên và xuất bộ hồ sơ PDF.</p>
     </section>
 
-    <nav class="workflow" aria-label="Các bước tạo hồ sơ">
-        <ol>
-            <li class="<?= is_array($inspection) ? 'is-done' : 'is-current' ?>" <?= !is_array($inspection) ? 'aria-current="step"' : '' ?>>
-                <span class="workflow-number">01</span><span>Chọn trình độ và Excel</span>
-            </li>
-            <li class="<?= is_array($inspection) ? 'is-current' : 'is-upcoming' ?>" <?= is_array($inspection) ? 'aria-current="step"' : '' ?>>
-                <span class="workflow-number">02</span><span>Rà soát dữ liệu</span>
-            </li>
-            <li class="<?= $canExport ? 'is-ready' : 'is-upcoming' ?>">
-                <span class="workflow-number">03</span><span>Tạo và tải PDF</span>
-            </li>
-        </ol>
-    </nav>
-
     <?php if ($message !== null): ?>
-        <div class="notice" role="status" aria-live="polite"><?= $e($message) ?></div>
+        <div class="notice" role="status" aria-live="polite"><span class="notice-icon" aria-hidden="true">i</span><?= $e($message) ?></div>
     <?php endif; ?>
 
-    <section class="panel upload-panel">
-        <div class="section-heading">
-            <span>01</span>
-            <div><h2>Nhập dữ liệu</h2><p>File tối đa 10 MB, định dạng XLSX, XLS hoặc CSV.</p></div>
-        </div>
-        <form method="post" enctype="multipart/form-data" class="upload-form">
-            <input type="hidden" name="action" value="inspect">
-            <input type="hidden" name="csrf" value="<?= $e($_SESSION['csrf']) ?>">
-            <label>
-                <span>Trình độ đào tạo</span>
-                <select name="level">
+    <section class="section-block forms-section" aria-labelledby="forms-title">
+        <div class="section-heading forms-heading">
+            <div>
+                <h2 id="forms-title">Mẫu trống</h2>
+                <p><?= count($forms) ?> biểu mẫu cho trình độ <?= $e($levels[$level]) ?>.</p>
+            </div>
+            <form class="form-level-filter" method="get">
+                <label for="catalog-level">Trình độ</label>
+                <select id="catalog-level" name="level">
                     <?php foreach ($levels as $value => $label): ?>
                         <option value="<?= $e($value) ?>" <?= $level === $value ? 'selected' : '' ?>><?= $e($label) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <button class="button button-secondary" type="submit">Đổi</button>
+            </form>
+        </div>
+        <p class="legal-note">Mẫu trống tham khảo Quyết định 62/2008, chưa xác nhận là mẫu hiện hành hoặc đã được trường phê duyệt. Vui lòng đối chiếu trước khi sử dụng.</p>
+
+        <form class="preview-form" method="get" action="./" target="_blank" rel="noopener">
+            <input type="hidden" name="action" value="preview">
+            <input type="hidden" name="level" value="<?= $e($level) ?>">
+            <label class="field-label" for="form-preview">Chọn biểu mẫu cần xem</label>
+            <div class="preview-controls">
+                <select id="form-preview" name="form" required>
+                    <option value="" selected disabled>Chọn một biểu mẫu</option>
+                    <optgroup label="Biểu mẫu theo trình độ">
+                        <?php foreach ($levelForms as $form): ?>
+                            <?php $formLabel = $form['name'] . (is_array($inspection) && !$form['ready'] ? ' (Thiếu bảng: ' . implode(', ', $form['missing_sheets']) . ')' : ''); ?>
+                            <option value="<?= $e($form['number']) ?>"><?= $e($formLabel) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                    <optgroup label="Biểu mẫu chung 1-7">
+                        <?php foreach ($commonForms as $form): ?>
+                            <?php $formLabel = $form['name'] . (is_array($inspection) && !$form['ready'] ? ' (Thiếu bảng: ' . implode(', ', $form['missing_sheets']) . ')' : ''); ?>
+                            <option value="<?= $e($form['number']) ?>"><?= $e($formLabel) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                </select>
+                <button class="button button-primary" type="submit">Xem mẫu</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="section-block upload-section" aria-labelledby="upload-title">
+        <div class="section-heading">
+            <div>
+                <h2 id="upload-title">Tải bảng Excel</h2>
+                <p>Trình độ đã chọn: <strong><?= $e($levels[$level]) ?></strong></p>
+            </div>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="upload-form">
+            <input type="hidden" name="action" value="inspect">
+            <input type="hidden" name="csrf" value="<?= $e($_SESSION['csrf']) ?>">
+            <input type="hidden" name="level" value="<?= $e($level) ?>">
+            <label class="field-group file-field">
+                <span class="field-label">Tệp dữ liệu người học</span>
+                <input type="file" name="excel_file" accept=".xlsx,.xls,.csv" required aria-describedby="file-help">
+                <small id="file-help">XLSX, XLS hoặc CSV. Tối đa 10 MB.</small>
             </label>
-            <label class="file-field">
-                <span>File dữ liệu</span>
-                <input type="file" name="excel_file" accept=".xlsx,.xls,.csv" required>
-                <small>Hỗ trợ XLSX, XLS hoặc CSV · tối đa 10 MB</small>
-            </label>
-            <button type="submit">Đọc file và tiếp tục</button>
+            <button class="button button-primary upload-button" type="submit">Đọc và kiểm tra</button>
         </form>
     </section>
 
     <?php if (is_array($inspection)): ?>
-        <section class="panel">
+        <section class="section-block data-section" aria-labelledby="data-title">
             <div class="section-heading">
-                <span>02</span>
-                <div><h2>Ánh xạ cột sinh viên</h2><p><?= $e($inspection['filename']) ?> <span aria-hidden="true">·</span> Sheet <?= $e($inspection['student_sheet']) ?></p></div>
-            </div>
-            <form method="post">
-                <input type="hidden" name="action" value="remap">
-                <input type="hidden" name="csrf" value="<?= $e($_SESSION['csrf']) ?>">
-                <input type="hidden" name="level" value="<?= $e($level) ?>">
-                <p class="section-hint">Đối chiếu tiêu đề Excel với trường thông tin tương ứng. Trường có dấu * là bắt buộc.</p>
-                <div class="mapping-grid">
-                    <?php foreach (StudentMapper::fields() as $key => $definition): ?>
-                        <label>
-                            <span><?= $e($definition['label']) ?><?= $definition['required'] ? ' *' : '' ?></span>
-                            <select name="mapping[<?= $e($key) ?>]">
-                                <option value="">— Chưa ánh xạ —</option>
-                                <?php foreach ($inspection['headers'] as $index => $header): ?>
-                                    <option value="<?= $index ?>" <?= ($mapping[$key] ?? null) === $index ? 'selected' : '' ?>><?= $e($header ?: 'Cột ' . ($index + 1)) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                    <?php endforeach; ?>
+                <div>
+                    <h2 id="data-title">Kiểm tra danh sách</h2>
+                    <p><?= count($mapped['students']) ?> người học được đọc từ tệp</p>
                 </div>
-                <button type="submit">Áp dụng ánh xạ</button>
-            </form>
-        </section>
-
-        <section class="panel">
-            <div class="section-heading">
-                <span>03</span>
-                <div><h2>Kiểm tra dữ liệu</h2><p><?= count($mapped['students']) ?> người học · <?= count($mapped['errors']) ?> lỗi</p></div>
+                <span class="result-count <?= $mapped['errors'] === [] ? 'result-ok' : 'result-error' ?>">
+                    <?= count($mapped['errors']) === 0 ? 'Không có lỗi' : count($mapped['errors']) . ' mục cần sửa' ?>
+                </span>
             </div>
             <?php if ($mapped['errors'] !== []): ?>
-                <ul class="errors">
+                <ul class="errors" aria-label="Các lỗi dữ liệu cần xử lý">
                     <?php foreach (array_slice($mapped['errors'], 0, 30) as $error): ?><li><?= $e($error) ?></li><?php endforeach; ?>
                 </ul>
             <?php else: ?>
-                <p class="success">Các trường bắt buộc đã hợp lệ và không có mã sinh viên trùng.</p>
+                <p class="success"><span aria-hidden="true">&#10003;</span> Các trường bắt buộc hợp lệ, không phát hiện mã người học trùng.</p>
             <?php endif; ?>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>Mã</th><th>Họ và tên</th><th>Ngày sinh</th><th>Lớp</th><th>Khóa</th><th>Nghề/ngành</th></tr></thead>
+                    <caption class="visually-hidden">Bản xem trước danh sách người học</caption>
+                    <thead><tr><th scope="col">Mã người học</th><th scope="col">Họ và tên</th><th scope="col">Ngày sinh</th><th scope="col">Lớp</th><th scope="col">Khóa</th><th scope="col">Nghề/ngành</th></tr></thead>
                     <tbody>
                     <?php foreach (array_slice($mapped['students'], 0, 20) as $student): ?>
                         <tr><td><?= $e($student['student_code']) ?></td><td><?= $e($student['full_name']) ?></td><td><?= $e($student['date_of_birth']) ?></td><td><?= $e($student['class_code']) ?></td><td><?= $e($student['course']) ?></td><td><?= $e($student['major']) ?></td></tr>
@@ -218,48 +249,52 @@ $e = [Html::class, 'escape'];
                     </tbody>
                 </table>
             </div>
+            <?php if (count($mapped['students']) > 20): ?>
+                <p class="table-note">Đang xem 20 trên <?= count($mapped['students']) ?> người học.</p>
+            <?php endif; ?>
         </section>
     <?php endif; ?>
 
-    <section class="panel">
-        <div class="section-heading">
-            <span><?= is_array($inspection) ? '04' : '02' ?></span>
-            <div><h2>Bộ biểu mẫu <?= $e(mb_strtolower($levels[$level], 'UTF-8')) ?></h2><p>Mẫu tham khảo theo Quyết định 62/2008. Đối chiếu quy định và mẫu đang áp dụng tại trường trước khi ký.</p></div>
-        </div>
-        <div class="form-list">
-            <?php foreach ($forms as $form): ?>
-                <article class="form-item">
-                    <div class="form-number"><?= str_pad((string) $form['number'], 2, '0', STR_PAD_LEFT) ?></div>
-                    <div class="form-description"><h3><?= $e($form['name']) ?></h3><p><?= $e($form['scope']) ?></p></div>
-                    <?php if (is_array($inspection)): ?>
-                        <span class="status <?= $form['ready'] ? 'ready' : 'missing' ?>"><?= $form['ready'] ? 'Có dữ liệu tham khảo' : 'Thiếu dữ liệu: ' . $e(implode(', ', $form['missing_sheets'])) ?></span>
-                    <?php else: ?>
-                        <span class="status neutral">Chờ file Excel</span>
-                    <?php endif; ?>
-                </article>
-            <?php endforeach; ?>
-        </div>
-        <?php if (is_array($inspection)): ?>
-            <div class="export-box">
-                <div>
-                    <strong>Tạo bộ văn bản</strong>
-                    <p>Xuất từng biểu mẫu thành PDF trong một file ZIP. Nội dung chưa có dữ liệu sẽ để trống để bạn kiểm tra.</p>
-                </div>
-                <?php if ($canExport): ?>
-                    <form method="post">
-                        <input type="hidden" name="action" value="export">
-                        <input type="hidden" name="csrf" value="<?= $e($_SESSION['csrf']) ?>">
-                        <input type="hidden" name="level" value="<?= $e($level) ?>">
-                        <button class="export-button" type="submit">Tạo và tải bộ PDF</button>
-                    </form>
-                <?php else: ?>
-                    <span class="export-disabled"><?= isset($inspection['sheet_data']) ? 'Hãy xử lý hết lỗi dữ liệu' : 'Vui lòng tải lại file Excel' ?></span>
-                <?php endif; ?>
+    <?php if (is_array($inspection)): ?>
+        <section class="export-box" aria-label="Xuất hồ sơ">
+            <div>
+                <strong>Xuất bộ hồ sơ</strong>
+                <p>Tải cả bộ dưới dạng ZIP hoặc chọn một biểu mẫu để tải PDF riêng.</p>
             </div>
+            <?php if ($canExport): ?>
+                <form class="export-all-form" method="post">
+                    <input type="hidden" name="action" value="export">
+                    <input type="hidden" name="csrf" value="<?= $e($_SESSION['csrf']) ?>">
+                    <input type="hidden" name="level" value="<?= $e($level) ?>">
+                    <button class="button button-primary export-button" type="submit">Tải cả bộ ZIP</button>
+                </form>
+            <?php else: ?>
+                <span class="export-disabled"><?= isset($inspection['sheet_data']) ? 'Hãy xử lý lỗi dữ liệu trước' : 'Vui lòng tải lại tệp Excel' ?></span>
+            <?php endif; ?>
+        </section>
+        <?php if ($canExport): ?>
+            <details class="export-single">
+                <summary class="button export-single-toggle">
+                    <span>Tải riêng từng biểu mẫu</span>
+                    <span class="export-single-count"><?= count($forms) ?> biểu mẫu</span>
+                </summary>
+                <div class="export-form-list" role="group" aria-label="Danh sách biểu mẫu tải riêng">
+                    <?php foreach ($forms as $form): ?>
+                        <form class="export-form-item" method="post">
+                            <input type="hidden" name="action" value="export-form">
+                            <input type="hidden" name="csrf" value="<?= $e($_SESSION['csrf']) ?>">
+                            <input type="hidden" name="level" value="<?= $e($level) ?>">
+                            <input type="hidden" name="form_number" value="<?= (int) $form['number'] ?>">
+                            <span>M<?= str_pad((string) $form['number'], 2, '0', STR_PAD_LEFT) ?> · <?= $e($form['name']) ?></span>
+                            <button class="button export-form-button" type="submit" aria-label="Tải PDF: <?= $e($form['name']) ?>">Tải PDF</button>
+                        </form>
+                    <?php endforeach; ?>
+                </div>
+            </details>
         <?php endif; ?>
-    </section>
+    <?php endif; ?>
 </main>
 
-<footer>Bộ hồ sơ theo dữ liệu đã nhập · Kiểm tra nội dung trước khi ký hoặc sử dụng chính thức</footer>
+<footer class="site-footer"><p>AIVANBAN <span aria-hidden="true">|</span> Kiểm tra nội dung trước khi ký hoặc sử dụng chính thức.</p></footer>
 </body>
 </html>

@@ -30,24 +30,191 @@ final class PdfDossierExporter
     {
         $archive = $this->buildArchive($level, $inspection, $mapping);
         $filename = 'AIVANBAN-ho-so-' . str_replace('_', '-', $level) . '-' . date('Ymd-His') . '.zip';
+        $this->streamDownload($archive, $filename, 'application/zip');
+    }
+
+    public function outputForm(string $level, int $formNumber, array $inspection, array $mapping): never
+    {
+        $archive = $this->buildArchive($level, $inspection, $mapping, $formNumber);
+        $zip = new ZipArchive();
+        if ($zip->open($archive) !== true) {
+            $this->removeDirectory(dirname($archive));
+            throw new \RuntimeException('Không thể mở tệp biểu mẫu vừa tạo.');
+        }
+
+        $pdfFilename = null;
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = $zip->getNameIndex($index);
+            if (is_string($name) && str_ends_with(strtolower($name), '.pdf')) {
+                $pdfFilename = basename($name);
+                break;
+            }
+        }
+        $zip->close();
+
+        if ($pdfFilename === null) {
+            $this->removeDirectory(dirname($archive));
+            throw new \RuntimeException('Không tìm thấy PDF của biểu mẫu đã chọn.');
+        }
+
+        $pdfPath = dirname($archive) . DIRECTORY_SEPARATOR . 'pdf' . DIRECTORY_SEPARATOR . $pdfFilename;
+        if (!is_file($pdfPath)) {
+            $this->removeDirectory(dirname($archive));
+            throw new \RuntimeException('Không tìm thấy PDF của biểu mẫu đã chọn.');
+        }
+
+        $this->streamDownload($pdfPath, $pdfFilename, 'application/pdf', dirname($archive));
+    }
+
+    private function streamDownload(string $path, string $filename, string $contentType, ?string $cleanupDirectory = null): never
+    {
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
         session_write_close();
-        header('Content-Type: application/zip');
+        header('Content-Type: ' . $contentType);
         header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Content-Length: ' . filesize($archive));
+        header('Content-Length: ' . filesize($path));
         header('Cache-Control: no-store, no-cache, must-revalidate');
-        readfile($archive);
-        $this->removeDirectory(dirname($archive));
+        readfile($path);
+        if ($cleanupDirectory !== null) {
+            $this->removeDirectory($cleanupDirectory);
+        }
         exit;
     }
 
-    public function buildArchive(string $level, array $inspection, array $mapping): string
+    public function outputBlankPreview(string $level, int $number): never
+    {
+        $config = self::LEVEL_CONFIG[$level] ?? null;
+        if ($config === null || !in_array($number, array_column(FormCatalog::package($level), 'number'), true)) {
+            throw new \InvalidArgumentException('Biểu mẫu xem trước không hợp lệ.');
+        }
+        if (!class_exists(Mpdf::class)) {
+            throw new \RuntimeException('Chưa cài thư viện mPDF.');
+        }
+
+        $storage = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'storage';
+        $exportRoot = $storage . DIRECTORY_SEPARATOR . 'exports';
+        $job = $exportRoot . DIRECTORY_SEPARATOR . bin2hex(random_bytes(10));
+        $pdfDir = $job . DIRECTORY_SEPARATOR . 'pdf';
+        $tempDir = $job . DIRECTORY_SEPARATOR . 'mpdf';
+        foreach ([$exportRoot, $job, $pdfDir, $tempDir] as $directory) {
+            if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+                throw new \RuntimeException('Không thể tạo thư mục tạm để xem biểu mẫu.');
+            }
+        }
+
+        try {
+            $course = ['trinhdo' => $config['label']];
+            $empty = [];
+            $path = null;
+            $html = '';
+            $format = [210, 297];
+            $filename = sprintf('AIVANBAN-mau-tham-khao-M%02d.pdf', $number);
+
+            switch ($number) {
+                case 1:
+                    $path = (new TrainingProgressPdf())->render(
+                        $pdfDir . DIRECTORY_SEPARATOR . $filename,
+                        $tempDir,
+                        $this->school($course),
+                        $course,
+                        $empty,
+                        $empty
+                    );
+                    break;
+                case 2:
+                    $html = $this->form02($course, $empty, $empty, $empty);
+                    $format = [297, 210];
+                    break;
+                case 3:
+                    $html = $this->form03($course, $empty, $empty, $empty, $empty, $empty);
+                    $format = [210, 297];
+                    break;
+                case 4:
+                    $html = $this->form04($course, $empty, $empty, $empty, $empty, $empty, $empty);
+                    $format = [210, 297];
+                    break;
+                case 5:
+                case 6:
+                case 7:
+                    $kind = [5 => 'LÝ THUYẾT', 6 => 'THỰC HÀNH', 7 => 'TÍCH HỢP'][$number];
+                    $html = $this->lessonBook($course, $number, $kind, $empty, $empty, $empty);
+                    $format = [210, 297];
+                    break;
+                case 8:
+                case 12:
+                    $html = $this->trainingPlan($course, $number, $config['label'], $empty, $empty);
+                    $format = [210, 297];
+                    break;
+                case 9:
+                    $html = $this->issueRegister($course, 9, 'SỔ CẤP CHỨNG CHỈ SƠ CẤP NGHỀ', 'Học sinh', $empty, $empty, false);
+                    $format = [210, 297];
+                    break;
+                case 10:
+                    $html = $this->copyRegister($course, 10, 'SỔ CẤP BẢN SAO CHỨNG CHỈ SƠ CẤP NGHỀ', 'Học sinh', $empty, $empty);
+                    $format = [210, 297];
+                    break;
+                case 11:
+                    $html = $this->profileBook(11, 'SỔ QUẢN LÝ HỌC SINH TRÌNH ĐỘ SƠ CẤP NGHỀ', 'Học sinh', $course, $empty, $empty, $empty, $empty, $empty);
+                    $format = [210, 297];
+                    break;
+                case 13:
+                    $html = $this->issueRegister($course, 13, 'SỔ CẤP BẰNG TỐT NGHIỆP TRUNG CẤP NGHỀ', 'Học sinh', $empty, $empty, true);
+                    $format = [210, 297];
+                    break;
+                case 14:
+                    $html = $this->issueRegister($course, 14, 'SỔ CẤP BẰNG TỐT NGHIỆP CAO ĐẲNG NGHỀ', 'Sinh viên', $empty, $empty, true);
+                    $format = [210, 297];
+                    break;
+                case 15:
+                    $html = $this->profileBook(15, 'SỔ QUẢN LÝ HỌC SINH TRÌNH ĐỘ TRUNG CẤP NGHỀ', 'Học sinh', $course, $empty, $empty, $empty, $empty, $empty);
+                    $format = [210, 297];
+                    break;
+                case 16:
+                    $html = $this->profileBook(16, 'SỔ QUẢN LÝ SINH VIÊN TRÌNH ĐỘ CAO ĐẲNG NGHỀ', 'Sinh viên', $course, $empty, $empty, $empty, $empty, $empty);
+                    $format = [210, 297];
+                    break;
+                case 17:
+                    $html = $this->copyRegister($course, 17, 'SỔ CẤP BẢN SAO BẰNG TỐT NGHIỆP TRUNG CẤP NGHỀ TỪ SỔ GỐC', 'Học sinh', $empty, $empty);
+                    $format = [210, 297];
+                    break;
+                case 18:
+                    $html = $this->copyRegister($course, 18, 'SỔ CẤP BẢN SAO BẰNG TỐT NGHIỆP CAO ĐẲNG NGHỀ TỪ SỔ GỐC', 'Sinh viên', $empty, $empty);
+                    $format = [210, 297];
+                    break;
+                default:
+                    throw new \InvalidArgumentException('Biểu mẫu xem trước không hợp lệ.');
+            }
+
+            if ($path === null) {
+                $path = $this->renderPdf($pdfDir, $tempDir, $filename, $format, $html);
+            }
+
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="' . $filename . '"');
+            header('Content-Length: ' . filesize($path));
+            header('Cache-Control: private, no-store, no-cache, must-revalidate');
+            readfile($path);
+            $this->removeDirectory($job);
+            exit;
+        } catch (\Throwable $exception) {
+            $this->removeDirectory($job);
+            throw $exception;
+        }
+    }
+
+    public function buildArchive(string $level, array $inspection, array $mapping, ?int $onlyFormNumber = null): string
     {
         $config = self::LEVEL_CONFIG[$level] ?? null;
         if ($config === null) {
             throw new \InvalidArgumentException('Trình độ đào tạo không hợp lệ.');
+        }
+        if ($onlyFormNumber !== null && !in_array($onlyFormNumber, array_column(FormCatalog::package($level), 'number'), true)) {
+            throw new \InvalidArgumentException('Biểu mẫu đã chọn không thuộc trình độ đào tạo này.');
         }
         if (!class_exists(Mpdf::class)) {
             throw new \RuntimeException('Chưa cài thư viện mPDF. Hãy chạy composer install.');
@@ -103,29 +270,67 @@ final class PdfDossierExporter
             $attendanceByStudent = $this->groupBy($attendance, 'mssv');
             $files = [];
 
-            $files[] = (new TrainingProgressPdf())->render($pdfDir . '/M01-Tien-do-dao-tao.pdf', $tempDir, $this->school($course), $course, $schedule, $students);
-            $files[] = $this->renderPdf($pdfDir, $tempDir, 'M02-Ke-hoach-giao-vien.pdf', [297, 210], $this->form02($course, $assignments, $teacherNames, $moduleNames));
-            $files[] = $this->renderPdf($pdfDir, $tempDir, 'M03-So-len-lop.pdf', [210, 297], $this->form03($course, $students, $teachers, $schedule, $grades, $attendance));
-            $files[] = $this->renderPdf($pdfDir, $tempDir, 'M04-So-tay-giao-vien.pdf', [210, 297], $this->form04($course, $students, $assignments, $teacherNames, $moduleNames, $grades, $attendance));
-            $files[] = $this->renderPdf($pdfDir, $tempDir, 'M05-So-giao-an-ly-thuyet.pdf', [210, 297], $this->lessonBook($course, 5, 'LÝ THUYẾT', $assignments, $teacherNames, $moduleNames));
-            $files[] = $this->renderPdf($pdfDir, $tempDir, 'M06-So-giao-an-thuc-hanh.pdf', [210, 297], $this->lessonBook($course, 6, 'THỰC HÀNH', $assignments, $teacherNames, $moduleNames));
-            $files[] = $this->renderPdf($pdfDir, $tempDir, 'M07-So-giao-an-tich-hop.pdf', [210, 297], $this->lessonBook($course, 7, 'TÍCH HỢP', $assignments, $teacherNames, $moduleNames));
+            if ($onlyFormNumber === null || $onlyFormNumber === 1) {
+                $files[] = (new TrainingProgressPdf())->render($pdfDir . '/M01-Tien-do-dao-tao.pdf', $tempDir, $this->school($course), $course, $schedule, $students);
+            }
+            if ($onlyFormNumber === null || $onlyFormNumber === 2) {
+                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M02-Ke-hoach-giao-vien.pdf', [297, 210], $this->form02($course, $assignments, $teacherNames, $moduleNames));
+            }
+            if ($onlyFormNumber === null || $onlyFormNumber === 3) {
+                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M03-So-len-lop.pdf', [210, 297], $this->form03($course, $students, $teachers, $schedule, $grades, $attendance));
+            }
+            if ($onlyFormNumber === null || $onlyFormNumber === 4) {
+                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M04-So-tay-giao-vien.pdf', [210, 297], $this->form04($course, $students, $assignments, $teacherNames, $moduleNames, $grades, $attendance));
+            }
+            if ($onlyFormNumber === null || $onlyFormNumber === 5) {
+                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M05-So-giao-an-ly-thuyet.pdf', [210, 297], $this->lessonBook($course, 5, 'LÝ THUYẾT', $assignments, $teacherNames, $moduleNames));
+            }
+            if ($onlyFormNumber === null || $onlyFormNumber === 6) {
+                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M06-So-giao-an-thuc-hanh.pdf', [210, 297], $this->lessonBook($course, 6, 'THỰC HÀNH', $assignments, $teacherNames, $moduleNames));
+            }
+            if ($onlyFormNumber === null || $onlyFormNumber === 7) {
+                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M07-So-giao-an-tich-hop.pdf', [210, 297], $this->lessonBook($course, 7, 'TÍCH HỢP', $assignments, $teacherNames, $moduleNames));
+            }
 
             if ($level === 'so_cap') {
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M08-Ke-hoach-dao-tao-so-cap.pdf', [210, 297], $this->trainingPlan($course, 8, $config['label'], $modules, $schedule));
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M09-So-cap-chung-chi-so-cap.pdf', [210, 297], $this->issueRegister($course, 9, 'SỔ CẤP CHỨNG CHỈ SƠ CẤP NGHỀ', 'Học sinh', $students, $graduationByStudent, false));
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M10-So-cap-ban-sao-chung-chi.pdf', [210, 297], $this->copyRegister($course, 10, 'SỔ CẤP BẢN SAO CHỨNG CHỈ SƠ CẤP NGHỀ', 'Học sinh', $students, $graduationByStudent));
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M11-So-quan-ly-hoc-sinh-so-cap.pdf', [210, 297], $this->profileBook(11, 'SỔ QUẢN LÝ HỌC SINH TRÌNH ĐỘ SƠ CẤP NGHỀ', 'Học sinh', $course, $students, $gradesByStudent, $attendanceByStudent, $graduationByStudent, $moduleNames));
+                if ($onlyFormNumber === null || $onlyFormNumber === 8) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M08-Ke-hoach-dao-tao-so-cap.pdf', [210, 297], $this->trainingPlan($course, 8, $config['label'], $modules, $schedule));
+                }
+                if ($onlyFormNumber === null || $onlyFormNumber === 9) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M09-So-cap-chung-chi-so-cap.pdf', [210, 297], $this->issueRegister($course, 9, 'SỔ CẤP CHỨNG CHỈ SƠ CẤP NGHỀ', 'Học sinh', $students, $graduationByStudent, false));
+                }
+                if ($onlyFormNumber === null || $onlyFormNumber === 10) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M10-So-cap-ban-sao-chung-chi.pdf', [210, 297], $this->copyRegister($course, 10, 'SỔ CẤP BẢN SAO CHỨNG CHỈ SƠ CẤP NGHỀ', 'Học sinh', $students, $graduationByStudent));
+                }
+                if ($onlyFormNumber === null || $onlyFormNumber === 11) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M11-So-quan-ly-hoc-sinh-so-cap.pdf', [210, 297], $this->profileBook(11, 'SỔ QUẢN LÝ HỌC SINH TRÌNH ĐỘ SƠ CẤP NGHỀ', 'Học sinh', $course, $students, $gradesByStudent, $attendanceByStudent, $graduationByStudent, $moduleNames));
+                }
             } elseif ($level === 'trung_cap') {
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M12-Ke-hoach-dao-tao-trung-cap.pdf', [210, 297], $this->trainingPlan($course, 12, $config['label'], $modules, $schedule));
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M13-So-cap-bang-tot-nghiep-trung-cap.pdf', [210, 297], $this->issueRegister($course, 13, 'SỔ CẤP BẰNG TỐT NGHIỆP TRUNG CẤP NGHỀ', 'Học sinh', $students, $graduationByStudent, true));
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M15-So-quan-ly-hoc-sinh-trung-cap.pdf', [210, 297], $this->profileBook(15, 'SỔ QUẢN LÝ HỌC SINH TRÌNH ĐỘ TRUNG CẤP NGHỀ', 'Học sinh', $course, $students, $gradesByStudent, $attendanceByStudent, $graduationByStudent, $moduleNames));
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M17-So-cap-ban-sao-bang-trung-cap.pdf', [210, 297], $this->copyRegister($course, 17, 'SỔ CẤP BẢN SAO BẰNG TỐT NGHIỆP TRUNG CẤP NGHỀ TỪ SỔ GỐC', 'Học sinh', $students, $graduationByStudent));
+                if ($onlyFormNumber === null || $onlyFormNumber === 12) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M12-Ke-hoach-dao-tao-trung-cap.pdf', [210, 297], $this->trainingPlan($course, 12, $config['label'], $modules, $schedule));
+                }
+                if ($onlyFormNumber === null || $onlyFormNumber === 13) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M13-So-cap-bang-tot-nghiep-trung-cap.pdf', [210, 297], $this->issueRegister($course, 13, 'SỔ CẤP BẰNG TỐT NGHIỆP TRUNG CẤP NGHỀ', 'Học sinh', $students, $graduationByStudent, true));
+                }
+                if ($onlyFormNumber === null || $onlyFormNumber === 15) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M15-So-quan-ly-hoc-sinh-trung-cap.pdf', [210, 297], $this->profileBook(15, 'SỔ QUẢN LÝ HỌC SINH TRÌNH ĐỘ TRUNG CẤP NGHỀ', 'Học sinh', $course, $students, $gradesByStudent, $attendanceByStudent, $graduationByStudent, $moduleNames));
+                }
+                if ($onlyFormNumber === null || $onlyFormNumber === 17) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M17-So-cap-ban-sao-bang-trung-cap.pdf', [210, 297], $this->copyRegister($course, 17, 'SỔ CẤP BẢN SAO BẰNG TỐT NGHIỆP TRUNG CẤP NGHỀ TỪ SỔ GỐC', 'Học sinh', $students, $graduationByStudent));
+                }
             } else {
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M12-Ke-hoach-dao-tao-cao-dang.pdf', [210, 297], $this->trainingPlan($course, 12, $config['label'], $modules, $schedule));
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M14-So-cap-bang-tot-nghiep-cao-dang.pdf', [210, 297], $this->issueRegister($course, 14, 'SỔ CẤP BẰNG TỐT NGHIỆP CAO ĐẲNG NGHỀ', 'Sinh viên', $students, $graduationByStudent, true));
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M16-So-quan-ly-sinh-vien-cao-dang.pdf', [210, 297], $this->profileBook(16, 'SỔ QUẢN LÝ SINH VIÊN TRÌNH ĐỘ CAO ĐẲNG NGHỀ', 'Sinh viên', $course, $students, $gradesByStudent, $attendanceByStudent, $graduationByStudent, $moduleNames));
-                $files[] = $this->renderPdf($pdfDir, $tempDir, 'M18-So-cap-ban-sao-bang-cao-dang.pdf', [210, 297], $this->copyRegister($course, 18, 'SỔ CẤP BẢN SAO BẰNG TỐT NGHIỆP CAO ĐẲNG NGHỀ TỪ SỔ GỐC', 'Sinh viên', $students, $graduationByStudent));
+                if ($onlyFormNumber === null || $onlyFormNumber === 12) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M12-Ke-hoach-dao-tao-cao-dang.pdf', [210, 297], $this->trainingPlan($course, 12, $config['label'], $modules, $schedule));
+                }
+                if ($onlyFormNumber === null || $onlyFormNumber === 14) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M14-So-cap-bang-tot-nghiep-cao-dang.pdf', [210, 297], $this->issueRegister($course, 14, 'SỔ CẤP BẰNG TỐT NGHIỆP CAO ĐẲNG NGHỀ', 'Sinh viên', $students, $graduationByStudent, true));
+                }
+                if ($onlyFormNumber === null || $onlyFormNumber === 16) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M16-So-quan-ly-sinh-vien-cao-dang.pdf', [210, 297], $this->profileBook(16, 'SỔ QUẢN LÝ SINH VIÊN TRÌNH ĐỘ CAO ĐẲNG NGHỀ', 'Sinh viên', $course, $students, $gradesByStudent, $attendanceByStudent, $graduationByStudent, $moduleNames));
+                }
+                if ($onlyFormNumber === null || $onlyFormNumber === 18) {
+                    $files[] = $this->renderPdf($pdfDir, $tempDir, 'M18-So-cap-ban-sao-bang-cao-dang.pdf', [210, 297], $this->copyRegister($course, 18, 'SỔ CẤP BẢN SAO BẰNG TỐT NGHIỆP CAO ĐẲNG NGHỀ TỪ SỔ GỐC', 'Sinh viên', $students, $graduationByStudent));
+                }
             }
 
             $archive = $job . DIRECTORY_SEPARATOR . 'AIVANBAN-ho-so-' . str_replace('_', '-', $level) . '.zip';
@@ -136,7 +341,9 @@ final class PdfDossierExporter
             foreach ($files as $file) {
                 $zip->addFile($file, basename($file));
             }
-            $zip->addFromString('README.txt', $this->readme($level, $config['label'], $inspection['filename'] ?? '', count($students)));
+            if ($onlyFormNumber === null) {
+                $zip->addFromString('README.txt', $this->readme($level, $config['label'], $inspection['filename'] ?? '', count($students)));
+            }
             $zip->close();
             return $archive;
         } catch (\Throwable $exception) {

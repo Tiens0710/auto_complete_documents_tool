@@ -68,6 +68,27 @@ foreach (['M01-Tien-do-dao-tao.pdf', 'M15-So-quan-ly-hoc-sinh-trung-cap.pdf', 'M
     $assert(in_array($expectedName, $names, true), 'Thiếu file ' . $expectedName . ' trong gói PDF.');
 }
 
+$singleArchive = (new PdfDossierExporter())->buildArchive('trung_cap', $inspection, $mapping, 13);
+$assert(is_file($singleArchive), 'Không tạo được gói tạm cho biểu mẫu tải riêng.');
+$singleZip = new ZipArchive();
+$assert($singleZip->open($singleArchive) === true, 'Gói tạm của biểu mẫu tải riêng không mở được.');
+$singlePdfNames = [];
+for ($index = 0; $index < $singleZip->numFiles; $index++) {
+    $name = $singleZip->getNameIndex($index);
+    if (is_string($name) && str_ends_with($name, '.pdf')) {
+        $singlePdfNames[] = $name;
+    }
+}
+$singleZip->close();
+$assert($singlePdfNames === ['M13-So-cap-bang-tot-nghiep-trung-cap.pdf'], 'Tải riêng phải chỉ tạo đúng PDF đã chọn.');
+
+try {
+    (new PdfDossierExporter())->buildArchive('trung_cap', $inspection, $mapping, 14);
+    $assert(false, 'Không được xuất biểu mẫu cao đẳng với trình độ trung cấp.');
+} catch (InvalidArgumentException) {
+    // The selected form number must belong to the chosen level.
+}
+
 if ($failures !== []) {
     fwrite(STDERR, implode(PHP_EOL, $failures) . PHP_EOL);
     exit(1);
