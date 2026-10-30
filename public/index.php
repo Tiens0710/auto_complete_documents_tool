@@ -260,9 +260,9 @@ header('X-Content-Type-Options: nosniff');
             <label class="file-drop" for="excel-file">
                 <span class="file-drop-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 17V11m-3 3 3-3 3 3"/></svg></span>
                 <span class="file-drop-title" id="selected-file" aria-live="polite">Thả file Excel vào đây</span>
-                <span class="file-drop-caption" id="file-help">XLSX, XLS hoặc CSV · Tối đa 10 MB</span>
+                <span class="file-drop-caption" id="file-help">Chỉ nhận Excel XLSX · Tối đa 10 MB</span>
                 <span class="file-pick-label">Hoặc chọn file từ máy</span>
-                <input id="excel-file" type="file" name="excel_file" accept=".xlsx,.xls,.csv" required aria-label="Chọn file Excel" aria-describedby="file-help selected-file">
+                <input id="excel-file" type="file" name="excel_file" accept=".xlsx" required aria-label="Chọn file Excel" aria-describedby="file-help selected-file">
             </label>
             <button class="button button-primary upload-button" type="submit">Tiếp tục →</button>
         </form>

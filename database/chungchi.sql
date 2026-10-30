@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS credentials (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    student_code VARCHAR(80) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    date_of_birth VARCHAR(32) NOT NULL,
+    place_of_birth VARCHAR(255) NOT NULL DEFAULT '',
+    credential_type VARCHAR(120) NOT NULL,
+    program VARCHAR(255) NOT NULL DEFAULT '',
+    graduation_classification VARCHAR(100) NOT NULL DEFAULT '',
+    diploma_number VARCHAR(100) NOT NULL,
+    diploma_issue_date VARCHAR(32) NOT NULL,
+    register_number VARCHAR(120) NOT NULL DEFAULT '',
+    pdf_path VARCHAR(255) NOT NULL,
+    status ENUM('draft', 'issued', 'revoked') NOT NULL DEFAULT 'draft',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_credentials_token_hash (token_hash),
+    UNIQUE KEY uq_credentials_type_diploma_number (credential_type, diploma_number),
+    KEY idx_credentials_diploma_number (diploma_number),
+    KEY idx_credentials_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

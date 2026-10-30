@@ -10,11 +10,14 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 final class SpreadsheetImporter
 {
     private const MAX_SIZE = 10 * 1024 * 1024;
-    private const ALLOWED_EXTENSIONS = ['xlsx', 'xls', 'csv'];
+    private const ALLOWED_EXTENSIONS = ['xlsx'];
 
     public function inspectUpload(array $file): array
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            if (in_array($file['error'] ?? null, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                throw new \RuntimeException('File vượt giới hạn tải lên của máy chủ. Hãy dùng file dưới 10 MB hoặc tăng giới hạn upload trong cPanel.');
+            }
             throw new \RuntimeException('Không nhận được file Excel hợp lệ.');
         }
         if (($file['size'] ?? 0) <= 0 || $file['size'] > self::MAX_SIZE) {
@@ -23,7 +26,7 @@ final class SpreadsheetImporter
 
         $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
         if (!in_array($extension, self::ALLOWED_EXTENSIONS, true)) {
-            throw new \RuntimeException('Chỉ chấp nhận file .xlsx, .xls hoặc .csv.');
+            throw new \RuntimeException('Chỉ chấp nhận file Excel .xlsx.');
         }
 
         $tmpName = (string) ($file['tmp_name'] ?? '');
@@ -31,7 +34,7 @@ final class SpreadsheetImporter
             throw new \RuntimeException('Nguồn file tải lên không hợp lệ.');
         }
 
-        $reader = IOFactory::createReaderForFile($tmpName);
+        $reader = IOFactory::createReader('Xlsx');
         $reader->setReadDataOnly(true);
         $spreadsheet = $reader->load($tmpName);
 

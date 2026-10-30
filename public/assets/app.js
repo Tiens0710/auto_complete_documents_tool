@@ -16,7 +16,7 @@
         title.textContent = file ? file.name : 'Thả file Excel vào đây';
         caption.textContent = file
             ? `${file.size >= 1048576 ? (file.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(file.size / 1024)) + ' KB'} · Đã chọn, sẵn sàng kiểm tra`
-            : 'XLSX, XLS hoặc CSV · Tối đa 10 MB';
+            : 'Chỉ nhận Excel XLSX · Tối đa 10 MB';
         pickLabel.textContent = file ? 'Chọn file khác' : 'Hoặc chọn file từ máy';
     };
 

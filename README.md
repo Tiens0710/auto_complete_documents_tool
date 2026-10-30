@@ -11,7 +11,7 @@ Phiên bản nền tảng đã có:
 - Chọn sơ cấp, trung cấp hoặc cao đẳng.
 - Giao diện chia thành ba trang: tải Excel → kiểm tra danh sách → xuất hồ sơ. Mẫu trống mở ở trang riêng; các bước sau chỉ mở khi dữ liệu đã hợp lệ.
 - Xác định đúng bộ biểu mẫu theo trình độ.
-- Tải và đọc `.xlsx`, `.xls`, `.csv` tối đa 10 MB.
+- Tải và đọc `.xlsx` tối đa 10 MB.
 - Tự nhận diện dữ liệu một sheet theo mẫu người học; ghép `Họ đệm` + `Tên` và dùng `TT` làm mã liên kết.
 - Lớp, khóa và nghề/ngành không có trong mẫu người học được để trống, không chặn nhập.
 - Kiểm tra trường bắt buộc và mã người học trùng.
@@ -54,6 +54,22 @@ php tests/run.php
 6. Bật HTTPS cho subdomain trước khi nhập dữ liệu thật.
 
 Không trỏ Document Root vào toàn bộ thư mục `AIVANBAN`, vì như vậy tài liệu nghiên cứu và file cấu hình có thể bị truy cập trực tiếp.
+
+## Cổng tra cứu văn bằng bằng QR
+
+Phần thử nghiệm nằm ở `public/chungchi` và dùng dữ liệu người học trong file `.xlsx`. PDF hiện tạo là **bản xem thử có watermark, chưa có giá trị cấp phát**. Cần nhận mẫu văn bằng trống đã được trường duyệt và nghiệm thu bố cục trước khi dùng để cấp văn bằng.
+
+Để chạy cổng trên cPanel:
+
+1. Tạo subdomain `chungchi.mtpc.edu.vn`, bật HTTPS và đặt Document Root thành `/home/mtpc/public_html/auto_complete_documents_tool/public/chungchi`.
+2. Bật PHP 8.3 cùng các extension `fileinfo`, `mbstring`, `zip` và `gd`. Đặt giới hạn upload và POST tối thiểu 10 MB.
+3. Tạo MySQL database/user trong cPanel. Dùng phpMyAdmin nhập `database/chungchi.sql`.
+4. Trong File Manager, sao chép `storage/chungchi-config.example.php` thành `storage/chungchi-config.php`, rồi điền thông tin database và mật khẩu quản trị dài, riêng biệt.
+5. Kiểm tra `storage/sessions`, `storage/credentials` và `storage/tmp/chungchi` có quyền ghi cho PHP. Các PDF nằm ngoài thư mục public.
+6. Cập nhật thư mục `vendor` trên hosting theo `composer.lock`. Nếu cPanel không có Terminal, có thể tạo gói ZIP thư mục `vendor` ở máy phát triển rồi tải và giải nén vào thư mục gốc của ứng dụng bằng File Manager; Git deployment chỉ chép `vendor` nếu thư mục đó đã có sẵn trong repository cPanel. Không thay `vendor` bằng phiên bản cũ.
+7. Trang cán bộ: `https://chungchi.mtpc.edu.vn/admin.php`. Cán bộ tải Excel, xem lại danh sách, rồi xác nhận tạo PDF nháp; QR đưa người xem đến trang tra cứu và PDF tương ứng.
+
+Mỗi lần tạo giới hạn 30 người, chỉ nhận `.xlsx`, và số hiệu văn bằng trùng trong file hoặc database sẽ bị từ chối. Bản xem trước dữ liệu tạm nằm trong phiên đăng nhập tối đa 15 phút; file Excel nguồn không được lưu lại.
 
 ## Tài liệu dự án
 
